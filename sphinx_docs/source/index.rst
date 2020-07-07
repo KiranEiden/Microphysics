@@ -1,4 +1,4 @@
-.. StarKiller documentation master file.
+.. StarKiller documentation main file.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
@@ -17,10 +17,11 @@ StarKiller Microphysics
    eos
    networks
    transport
+   cxx
    gpu
    unit_tests
    sdc
-   references
+   zreferences
 
 
 Indices and tables

@@ -11,9 +11,17 @@ USE_MPI    = FALSE
 USE_OMP    = FALSE
 
 USE_REACT = TRUE
-USE_SDC = TRUE
+USE_SIMPLIFIED_SDC = TRUE
 
 EBASE = main
+
+USE_CXX_EOS = FALSE
+
+USE_CXX_REACTIONS = FALSE
+
+ifeq ($(USE_CXX_REACTIONS),TRUE)
+  DEFINES += -DCXX_REACTIONS
+endif
 
 # define the location of the CASTRO top directory
 MICROPHYSICS_HOME  := ../..
@@ -25,6 +33,7 @@ EOS_DIR     := helmholtz
 # This sets the network directory in Castro/Networks
 NETWORK_DIR := aprox13
 INTEGRATOR_DIR := VODE
+DEFINES += -DSDC_EVOLVE_ENERGY
 
 CONDUCTIVITY_DIR := stellar
 
