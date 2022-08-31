@@ -1,0 +1,11 @@
+H H 1.0 1.0
+He He 2.0 4.0
+C C 6.0 12.0
+O O 8.0 16.0
+
+#aux variables
+__aux_Ye
+__aux_invmu
+__aux_Xej
+__aux_Xcsm
+__aux_Xamb
