@@ -39,8 +39,8 @@ HEADER = """
 """
 
 CXX_HEADER = """
-#ifndef _external_parameters_H_
-#define _external_parameters_H_
+#ifndef EXTERNAL_PARAMETERS_H
+#define EXTERNAL_PARAMETERS_H
 #include <AMReX_BLFort.H>
 #include <AMReX_REAL.H>
 
@@ -214,7 +214,7 @@ def write_probin(probin_template, param_files,
 
         namespaces = {q.namespace for q in params}
 
-        for nm in namespaces:
+        for nm in sorted(namespaces):
             params_nm = [q for q in params if q.namespace == nm]
 
             # open namespace
