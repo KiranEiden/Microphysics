@@ -13,6 +13,8 @@
 #include <integrator_rhs_simplified_sdc.H>
 #include <react_util.H>
 
+using namespace unit_test_rp;
+
 void do_vode_rhs()
 {
 
@@ -188,7 +190,7 @@ void do_vode_rhs()
 
     burn_t burn_state;
 
-    eos_t eos_state;
+    eos_extra_t eos_state;
     eos_state.rho = density;
     eos_state.T = temperature;
     for (int n = 0; n < NumSpec; n++) {
@@ -215,7 +217,6 @@ void do_vode_rhs()
     }
 #endif
 
-#if defined(SDC_EVOLVE_ENERGY)
     burn_state.y[SRHO] = density;
 
     burn_state.y[SMX] = 0.0;
@@ -225,17 +226,7 @@ void do_vode_rhs()
     burn_state.y[SEINT] = burn_state.y[SRHO] * eos_state.e;
     burn_state.y[SEDEN] = burn_state.y[SEINT];
 
-#elif defined(SDC_EVOLVE_ENTHALPY)
-    burn_state.y[SENTH] = burn_state.rho * eos_state.h;
-
-    burn_state.p0 = eos_state.p;
-#endif
-
-#if defined(SDC_EVOLVE_ENERGY)
     Real rhoe_old = burn_state.y[SEINT];
-#elif defined (SDC_EVOLVE_ENTHALPY)
-    Real rhoh_old = burn_state.y[SENTH];
-#endif
 
     // now initialize the advective terms -- the only ones that are
     // actually used during the integration are for rho, (rho X), and

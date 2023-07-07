@@ -16,13 +16,15 @@
 #include <nonaka_plot.H>
 #endif
 
+using namespace integrator_rp;
+
 // The rhs routine provides the right-hand-side for the DVODE solver.
 // This is a generic interface that calls the specific RHS routine in the
 // network you're actually using.
 
-template <typename T>
+template <typename BurnT, typename T>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void rhs (const Real time, burn_t& state, T& int_state, RArray1D& ydot, [[maybe_unused]] const bool in_jacobian=false)
+void rhs (const Real time, BurnT& state, T& int_state, RArray1D& ydot, [[maybe_unused]] const bool in_jacobian=false)
 {
 
     // We are integrating a system of
@@ -36,9 +38,9 @@ void rhs (const Real time, burn_t& state, T& int_state, RArray1D& ydot, [[maybe_
     // network
 
     // Fix the state as necessary -- this ensures that the mass
-    // fractions that enter are valud (and optionally normalized)
+    // fractions that enter are valid (and optionally normalized)
 
-    clean_state(int_state);
+    clean_state(time, state, int_state);
 
     // Update the thermodynamics as necessary -- this primarily takes
     // the information in int_state (X and e), copies it to the
@@ -86,6 +88,11 @@ void rhs (const Real time, burn_t& state, T& int_state, RArray1D& ydot, [[maybe_
         }
     }
 
+    // scale the energy
+    if (scale_system) {
+        ydot(net_ienuc) /= state.e_scale;
+    }
+
     // Allow energy integration to be disabled.
 
     if (!integrate_energy) {
@@ -105,9 +112,9 @@ void rhs (const Real time, burn_t& state, T& int_state, RArray1D& ydot, [[maybe_
 
 
 // Analytical Jacobian
-template<typename T, class MatrixType>
+template<typename BurnT, typename T, class MatrixType>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void jac ([[maybe_unused]] const Real time, burn_t& state, T& int_state, MatrixType& pd)
+void jac ([[maybe_unused]] const Real time, BurnT& state, T& int_state, MatrixType& pd)
 {
 
     // Only do the burn if the incoming temperature is within the temperature
@@ -143,6 +150,13 @@ void jac ([[maybe_unused]] const Real time, burn_t& state, T& int_state, MatrixT
                 pd.mul(j, i, aion[j-1]);
                 pd.mul(i, j, aion_inv[j-1]);
             }
+        }
+    }
+
+    // scale the energy derivatives
+    if (scale_system) {
+        for (int j = 1; j <= INT_NEQS; ++j) {
+            pd(net_ienuc,j) /= state.e_scale;
         }
     }
 

@@ -44,14 +44,14 @@ void check_nse_molar(burn_t& state, const burn_t& nse_state, bool& nse_check){
   // Check if n,p,a are in equilibrium
   // these two ratios are defined in the ASE paper to determine whether network is in equilibrium
 
-  for (int n = 0; n < NumSpec; ++n){
+  for (int n = 0; n < NumSpec; ++n) {
 
-    if (n == NSE_INDEX::p_index || n == NSE_INDEX::n_index){
+    if (n == NSE_INDEX::p_index || n == NSE_INDEX::n_index) {
       r /= state.xn[n] * state.xn[n] * aion_inv[n] * aion_inv[n];
       r_nse /= nse_state.xn[n] * nse_state.xn[n] * aion_inv[n] * aion_inv[n];
     }
 
-    else if (n == NSE_INDEX::he4_index){
+    else if (n == NSE_INDEX::he4_index) {
       r *= state.xn[n] * aion_inv[n];
       r_nse *= nse_state.xn[n] * aion_inv[n];
     }
@@ -653,7 +653,7 @@ void nse_union(const int nuc_ind_a, const int nuc_ind_b, amrex::Array1D<int, 1, 
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 int get_pair_rate_index(const int& rate_index){
 
-  // This funciton finds the pair rate index given a rate.
+  // This function finds the pair rate index given a rate.
   // For example given forward rate index, return reverse rate index, vice versa
 
   int pair_rate_index = -1;
@@ -949,7 +949,7 @@ void nse_grouping(amrex::Array1D<int, 1, NumSpec>& group_ind, const burn_t& stat
     merge_indices(2) = -1;
     fastest_t = std::numeric_limits<amrex::Real>::max();
 
-    // Find the fastest time scale of the avaliable reaction
+    // Find the fastest time scale of the available reaction
 
     for (int n = 1; n <= Rates::NumRates; ++n){
 
@@ -991,27 +991,39 @@ bool in_nse(burn_t& current_state, bool skip_molar_check=false) {
 
   const auto nse_state = get_actual_nse_state(current_state);
 
+  burn_t state = current_state;
+
+#ifndef STRANG
+  // if not strang, store mass fractions
+  for (int n = 0; n < NumSpec; ++n) {
+    state.xn[n] = current_state.y[SFS+n] / current_state.rho;
+  }
+#endif
+  
   // Check whether state is in the ballpark of NSE
 
   if (!skip_molar_check) {
 
-    check_nse_molar(current_state, nse_state, current_state.nse);    
+    check_nse_molar(state, nse_state, current_state.nse);
     if (!current_state.nse) {
       return current_state.nse;
     }
   }
 
   // We can do a further approximation where we use the NSE mass fractions
-  // instead of the current mass fractions. This makes the check soley dependent on
+  // instead of the current mass fractions. This makes the check solely dependent on
   // the thermodynamic condition.
   // Note we only do this after the first check, which should tell us whether
   // our current mass fractions are in the ballpark of NSE mass fractions.
-
-  burn_t state = current_state;
-
+  
   if (nse_molar_independent) {
     state = nse_state;
     state.dx = current_state.dx;
+#ifndef STRANG
+    for (int n = 0; n < NumSpec; ++n) {
+      state.y[SFS+n] = nse_state.xn[n] * nse_state.rho;
+    }
+#endif
   }
 
   // set molar fractions
@@ -1029,7 +1041,9 @@ bool in_nse(burn_t& current_state, bool skip_molar_check=false) {
   constexpr int do_T_derivatives = 0;
   evaluate_rates<do_T_derivatives, rate_t>(state, rate_eval);
 
-  eos_t eos_state;                             // need eos_state for speed of sound
+  // need eos_state for speed of sound
+
+  eos_t eos_state;
 
   // Initialize t_s, sound crossing timescale for a single zone to be max
 
@@ -1038,9 +1052,12 @@ bool in_nse(burn_t& current_state, bool skip_molar_check=false) {
   // If we care about checking the timescale of the rate to be smaller than t_s, then:
 
   if (!nse_dx_independent) {
-    burn_to_eos<eos_t>(state, eos_state);
+    burn_to_eos(state, eos_state);
     eos(eos_input_rt, eos_state);
-    t_s = state.dx / eos_state.cs;   // a parameter to characterize whether a rate is fast enough
+    
+    // a parameter to characterize whether a rate is fast enough
+
+    t_s = state.dx / eos_state.cs;
   }
 
   // Find ydot
@@ -1055,7 +1072,7 @@ bool in_nse(burn_t& current_state, bool skip_molar_check=false) {
 #ifdef NEUTRINOS
   // get abar and zbar
   composition(state);
-  
+
   amrex::Real sneut, dsneutdt, dsneutdd, snuda, snudz;
   sneut5(state.T, state.rho, state.abar, state.zbar, sneut, dsneutdt, dsneutdd, snuda, snudz);
 #else
@@ -1067,7 +1084,7 @@ bool in_nse(burn_t& current_state, bool skip_molar_check=false) {
   ydot(NumSpec + 1) = enuc - sneut;
 
   // Now we look through the network and see if there are fast reaction cycles
-  // Need to separate forward and reverse rate and detemine each step is fast enough.
+  // Need to separate forward and reverse rate and determine each step is fast enough.
   // use vectors for now
 
   bool found_fast_reaction_cycle = false;

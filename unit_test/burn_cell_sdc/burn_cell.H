@@ -9,6 +9,8 @@
 #include <iostream>
 #include <react_util.H>
 
+using namespace unit_test_rp;
+
 void burn_cell_c()
 {
 
@@ -206,7 +208,7 @@ void burn_cell_c()
 
     burn_t burn_state;
 
-    eos_t eos_state;
+    eos_extra_t eos_state;
     eos_state.rho = density;
     eos_state.T = temperature;
 
@@ -241,7 +243,6 @@ void burn_cell_c()
     }
 #endif
 
-#if defined(SDC_EVOLVE_ENERGY)
     burn_state.y[SRHO] = density;
 
     burn_state.y[SMX] = 0.0;
@@ -250,12 +251,6 @@ void burn_cell_c()
 
     burn_state.y[SEINT] = rhoe;
     burn_state.y[SEDEN] = burn_state.y[SEINT];
-
-#elif defined(SDC_EVOLVE_ENTHALPY)
-    burn_state.y[SENTH] = burn_state.rho * eos_state.h;
-
-    burn_state.p0 = eos_state.p;
-#endif
 
     // now initialize the advective terms -- the only ones that are
     // actually used during the integration are for rho, (rho X), and
@@ -298,11 +293,6 @@ void burn_cell_c()
 
     burn_state.T_fixed = -1.0;
 
-
-    // output initial burn type data
-    Real time = 0.0_rt;
-
-
     std::ofstream state_over_time("state_over_time.txt");
 
     // we will divide the total integration time into nsteps that are
@@ -321,11 +311,6 @@ void burn_cell_c()
     } else {
         dlogt = (std::log10(tmax) - std::log10(tfirst)) / (nsteps - 1);
     }
-
-    // save the initial state -- we'll use this to determine
-    // how much things changed over the entire burn
-
-    burn_t state_in = burn_state;
 
     // output the data in columns, one line per timestep
 

@@ -11,7 +11,6 @@
 #include <microphysics_math.H>
 #include <actual_network.H>
 #include <burn_type.H>
-#include <rate_type.H>
 #include <screen.H>
 #include <jacobian_utilities.H>
 #include <fundamental_constants.H>
@@ -19,6 +18,7 @@
 using namespace amrex;
 using namespace ArrayUtil;
 using namespace Rates;
+using namespace network_rp;
 
 void actual_rhs_init ();
 

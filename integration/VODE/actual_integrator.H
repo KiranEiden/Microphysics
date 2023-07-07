@@ -14,10 +14,15 @@
 #include <vode_type.H>
 #include <vode_dvode.H>
 
+using namespace integrator_rp;
+
+template <typename BurnT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void actual_integrator (burn_t& state, Real dt)
+void actual_integrator (BurnT& state, Real dt)
 {
-    dvode_t vode_state;
+    constexpr int int_neqs = integrator_neqs<BurnT>();
+
+    dvode_t<int_neqs> vode_state{};
 
     // Set the tolerances.
 
@@ -39,6 +44,12 @@ void actual_integrator (burn_t& state, Real dt)
     vode_state.t = 0.0_rt;
     vode_state.tout = dt;
 
+    // Initialize ydot to zero for Strang burn.
+
+    for (int n = 0; n < SVAR; ++n) {
+        state.ydot_a[n] = 0;
+    }
+
     // Set the (inverse of the) timestep limiter.
 
     vode_state.HMXI = 1.0_rt / ode_max_dt;
@@ -47,6 +58,15 @@ void actual_integrator (burn_t& state, Real dt)
     // to fill the rest of the thermodynamic variables.
 
     eos(eos_input_rt, state);
+
+    // set the scaling for energy if we integrate it dimensionlessly
+    state.e_scale = state.e;
+
+    if (scale_system) {
+        // the absolute tol for energy needs to reflect the scaled
+        // energy the integrator sees
+        vode_state.atol_enuc /= state.e_scale;
+    }
 
     // Fill in the initial integration state.
 
@@ -66,6 +86,7 @@ void actual_integrator (burn_t& state, Real dt)
     // Call the integration routine.
 
     int istate = dvode(state, vode_state);
+    state.error_code = istate;
 
     // Copy the integration data back to the burn state.
 
@@ -76,7 +97,7 @@ void actual_integrator (burn_t& state, Real dt)
     // this in case we failed in our burn here because we entered NSE
 
 #ifdef AUX_THERMO
-    // need to sync the auxilary data up with the new mass fractions
+    // need to sync the auxiliary data up with the new mass fractions
     set_aux_comp_from_X(state);
 #endif
 
@@ -107,19 +128,19 @@ void actual_integrator (burn_t& state, Real dt)
     // Add some checks that indicate a burn fail even if VODE thinks the
     // integration was successful.
 
-    if (istate < 0) {
+    if (istate != IERR_SUCCESS) {
         state.success = false;
     }
 
     for (int n = 1; n <= NumSpec; ++n) {
-        if (vode_state.y(n) < -vode_failure_tolerance) {
+        if (vode_state.y(n) < -species_failure_tolerance) {
             state.success = false;
         }
 
         // Don't enforce the condition below
         // for primordial chem
         if (!use_number_densities) {
-            if (vode_state.y(n) > 1.0_rt + vode_failure_tolerance) {
+            if (vode_state.y(n) > 1.0_rt + species_failure_tolerance) {
                 state.success = false;
             }
         }
@@ -139,7 +160,7 @@ void actual_integrator (burn_t& state, Real dt)
     // If we failed, print out the current state of the integration.
 
     if (!state.success) {
-        if (istate != -100) {
+        if (istate != IERR_ENTERED_NSE) {
 #ifndef AMREX_USE_GPU
             std::cout << Font::Bold << FGColor::Red << "[ERROR] integration failed in net" << ResetDisplay << std::endl;
             std::cout << "istate = " << istate << std::endl;

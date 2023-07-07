@@ -20,9 +20,11 @@
 #include <nse_check.H>
 #endif
 
+template <typename BurnT, typename DvodeT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-int dvode (burn_t& state, dvode_t& vstate)
+int dvode (BurnT& state, DvodeT& vstate)
 {
+    constexpr int int_neqs = integrator_neqs<BurnT>();
 
     // Local variables
     Real H0, S;
@@ -30,7 +32,7 @@ int dvode (burn_t& state, dvode_t& vstate)
 
     // Flag determining if we were successful.
 
-    int istate = 1;
+    int istate = IERR_SUCCESS;
 
     // Return if the final time matches the starting time.
 
@@ -50,11 +52,11 @@ int dvode (burn_t& state, dvode_t& vstate)
 
     // Initial call to the RHS.
 
-    Array1D<Real, 1, VODE_NEQS> f_init;
+    Array1D<Real, 1, int_neqs> f_init;
 
     rhs(vstate.t, state, vstate, f_init);
 
-    for (int i = 1; i <= VODE_NEQS; ++i) {
+    for (int i = 1; i <= int_neqs; ++i) {
         vstate.yh(i,2) = f_init(i);
     }
 
@@ -62,7 +64,7 @@ int dvode (burn_t& state, dvode_t& vstate)
 
     // Load the initial value array in yh.
 
-    for (int i = 1; i <= VODE_NEQS; ++i) {
+    for (int i = 1; i <= int_neqs; ++i) {
         vstate.yh(i,1) = vstate.y(i);
     }
 
@@ -104,7 +106,7 @@ int dvode (burn_t& state, dvode_t& vstate)
 
     // Load H with H0 and scale yh(:,2) by H0.
     vstate.H = H0;
-    for (int i = 1; i <= VODE_NEQS; ++i) {
+    for (int i = 1; i <= int_neqs; ++i) {
         vstate.yh(i,2) *= H0;
     }
 
@@ -145,14 +147,13 @@ int dvode (burn_t& state, dvode_t& vstate)
 #ifndef AMREX_USE_GPU
                std::cout << Font::Bold << FGColor::Red << "DVODE: maximum number of steps taken before reaching TOUT" << ResetDisplay << std::endl;
 #endif
-               for (int i = 1; i <= VODE_NEQS; ++i) {
+               for (int i = 1; i <= int_neqs; ++i) {
                    vstate.y(i) = vstate.yh(i,1);
                }
 
                vstate.t = vstate.tn;
 
-               istate = -1;
-               return istate;
+               return IERR_TOO_MANY_STEPS;
 
            }
 
@@ -181,10 +182,10 @@ int dvode (burn_t& state, dvode_t& vstate)
        }
 
        Real TOLSF = 0.0_rt;
-       for (int i = 1; i <= VODE_NEQS; ++i) {
+       for (int i = 1; i <= int_neqs; ++i) {
            TOLSF += (vstate.yh(i,1) * vstate.ewt(i)) * (vstate.yh(i,1) * vstate.ewt(i));
        }
-       TOLSF = UROUND * std::sqrt(TOLSF / VODE_NEQS);
+       TOLSF = UROUND * std::sqrt(TOLSF / int_neqs);
 
        if (TOLSF > 1.0_rt) {
 
@@ -192,22 +193,20 @@ int dvode (burn_t& state, dvode_t& vstate)
 #ifndef AMREX_USE_GPU
                std::cout << Font::Bold << FGColor::Red << "DVODE: too much accuracy requested at start of integration" << ResetDisplay << std::endl;
 #endif
-               istate = -3;
-               return istate;
+               return IERR_TOO_MUCH_ACCURACY_REQUESTED;
            }
 
            // Too much accuracy requested for machine precision.
 #ifndef AMREX_USE_GPU
            std::cout << "DVODE: too much accuracy requested" << std::endl;
 #endif
-           for (int i = 1; i <= VODE_NEQS; ++i) {
+           for (int i = 1; i <= int_neqs; ++i) {
                vstate.y(i) = vstate.yh(i,1);
            }
 
            vstate.t = vstate.tn;
 
-           istate = -2;
-           return istate;
+           return IERR_TOO_MUCH_ACCURACY_REQUESTED;
 
        }
 
@@ -222,14 +221,12 @@ int dvode (burn_t& state, dvode_t& vstate)
            std::cout << Font::Bold << FGColor::Red << "DVODE: error test failed repeatedly or with abs(H) = HMIN" << ResetDisplay << std::endl;
 #endif
            // Set Y array, T, and optional output.
-           for (int i = 1; i <= VODE_NEQS; ++i) {
+           for (int i = 1; i <= int_neqs; ++i) {
                vstate.y(i) = vstate.yh(i,1);
            }
 
            vstate.t = vstate.tn;
-
-           istate = -4;
-           return istate;
+           return IERR_DT_UNDERFLOW;
 
        }
        else if (kflag == -2) {
@@ -238,14 +235,12 @@ int dvode (burn_t& state, dvode_t& vstate)
            std::cout << Font::Bold << FGColor::Red << "DVODE: corrector convergence failed repeatedly or with abs(H) = HMIN" << ResetDisplay << std::endl;
 #endif
            // Set Y array, T, and optional output.
-           for (int i = 1; i <= VODE_NEQS; ++i) {
+           for (int i = 1; i <= int_neqs; ++i) {
                vstate.y(i) = vstate.yh(i,1);
            }
 
            vstate.t = vstate.tn;
-
-           istate = -5;
-           return istate;
+           return IERR_CORRECTOR_CONVERGENCE;
 
        }
 
@@ -270,9 +265,8 @@ int dvode (burn_t& state, dvode_t& vstate)
 #endif
 
            if (in_nse(state)) {
-               istate = -100;
                vstate.t = vstate.tn;
-               return istate;
+               return IERR_ENTERED_NSE;
            }
        }
 #endif
@@ -285,7 +279,7 @@ int dvode (burn_t& state, dvode_t& vstate)
 
        // If TOUT has been reached, interpolate.
 
-       for (int i = 1; i <= VODE_NEQS; ++i) {
+       for (int i = 1; i <= int_neqs; ++i) {
            vstate.y(i) = vstate.yh(i,vstate.L);
        }
 
@@ -293,18 +287,16 @@ int dvode (burn_t& state, dvode_t& vstate)
 
        for (int jb = 1; jb <= vstate.NQ; ++jb) {
            int j = vstate.NQ - jb;
-           for (int i = 1; i <= VODE_NEQS; ++i) {
+           for (int i = 1; i <= int_neqs; ++i) {
                vstate.y(i) = vstate.yh(i,j+1) + S * vstate.y(i);
            }
        }
 
        vstate.t = vstate.tout;
 
-       istate = 2;
-       return istate;
+       return IERR_SUCCESS;
 
     }
-
 }
 
 #endif

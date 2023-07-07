@@ -6,13 +6,16 @@
 #include <rhs.H>
 #include <actual_rhs.H>
 #include <burn_type.H>
-#include <rate_type.H>
 #include <eos_type.H>
 #include <eos.H>
 #include <extern_parameters.H>
+#include <integrator_data.H>
 
+using namespace integrator_rp;
+
+template <typename BurnT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void clean_state (burn_t& state)
+void clean_state (BurnT& state)
 {
     // Renormalize the abundances.
 
@@ -29,8 +32,9 @@ void clean_state (burn_t& state)
     state.T = amrex::min(MAX_TEMP, amrex::max(state.T, EOSData::mintemp));
 }
 
+template <typename BurnT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void initialize_state (burn_t& state)
+void initialize_state (BurnT& state)
 {
     // We assume that (rho, T) coming in are valid, do an EOS call
     // to fill the rest of the thermodynamic variables.
@@ -38,20 +42,30 @@ void initialize_state (burn_t& state)
     eos(eos_input_rt, state);
 
     state.success = true;
+    state.error_code = IERR_SUCCESS;
 
     state.time = 0.0;
     state.n_rhs = 0;
     state.n_step = 0;
+
+    // Initialize ydot to zero for Strang burn.
+
+    for (int n = 0; n < SVAR; ++n) {
+        state.ydot_a[n] = 0;
+    }
 }
 
+template <typename BurnT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void evaluate_rhs (burn_t& state, Array1D<Real, 1, NumSpec>& f_minus, Array1D<Real, 1, NumSpec>& f_plus,
+void evaluate_rhs (BurnT& state, Array1D<Real, 1, NumSpec>& f_minus, Array1D<Real, 1, NumSpec>& f_plus,
                    Real& dedt)
 {
     // Call the RHS with a special array that will record both the positive and negative
     // contributions to each integration quantity.
 
-    Array1D<Real, 1, 2 * neqs> ydot;
+    constexpr int int_neqs = integrator_neqs<BurnT>();
+
+    Array1D<Real, 1, 2 * int_neqs> ydot;
     RHS::rhs(state, ydot);
 
     // Now unpack the positive and negative contributions.
@@ -93,10 +107,11 @@ Real alpha (const Real& r)
     }
 }
 
+template <typename BurnT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-bool predictor (burn_t& state_0, Array1D<Real, 1, NumSpec>& f_minus_0,
+bool predictor (BurnT& state_0, Array1D<Real, 1, NumSpec>& f_minus_0,
                 Array1D<Real, 1, NumSpec>& f_plus_0, Real& dedt_0,
-                const Real& t, const Real& dt, burn_t& state)
+                const Real& t, const Real& dt, BurnT& state)
 {
     evaluate_rhs(state_0, f_minus_0, f_plus_0, dedt_0);
 
@@ -124,10 +139,11 @@ bool predictor (burn_t& state_0, Array1D<Real, 1, NumSpec>& f_minus_0,
     return true;
 }
 
+template <typename BurnT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-bool corrector (const burn_t& state_0, const Array1D<Real, 1, NumSpec>& f_minus_0,
+bool corrector (const BurnT& state_0, const Array1D<Real, 1, NumSpec>& f_minus_0,
                 const Array1D<Real, 1, NumSpec>& f_plus_0, const Real& dedt_0,
-                const Real& t, const Real& dt, burn_t& state)
+                const Real& t, const Real& dt, BurnT& state)
 {
     // Note that the corrector involves a re-evaluation of the rates. This seems
     // safe given how temperature sensitive our rates are. Mott et al. recommend
@@ -177,8 +193,9 @@ bool corrector (const burn_t& state_0, const Array1D<Real, 1, NumSpec>& f_minus_
     return true;
 }
 
+template <typename BurnT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void actual_integrator (burn_t& state, Real dt)
+void actual_integrator (BurnT& state, Real dt)
 {
     initialize_state(state);
 
@@ -235,7 +252,7 @@ void actual_integrator (burn_t& state, Real dt)
 
         // Make a copy of the old-time state, which does not change in the iterations.
 
-        burn_t state_0 = state;
+        BurnT state_0 = state;
 
         // Calculate the quasi-steady-state update. This is based on Guidry et al. paper II.
         // (The actual implementation largely follows Mott et al. (2000, 2001) from CHEMEQ2.)
@@ -297,7 +314,7 @@ void actual_integrator (burn_t& state, Real dt)
 
             // Save the initial predictor state.
 
-            burn_t predictor_state = state;
+            BurnT predictor_state = state;
 
             if (!success) {
                 dt_sub *= dt_cut_factor;
@@ -358,6 +375,7 @@ void actual_integrator (burn_t& state, Real dt)
 
         if (timestep_iter >= num_timestep_iters) {
             state.success = false;
+            state.error_code = IERR_CORRECTOR_CONVERGENCE;
             break;
         }
 
@@ -370,6 +388,7 @@ void actual_integrator (burn_t& state, Real dt)
 
     if (num_timesteps >= ode_max_steps) {
         state.success = false;
+        state.error_code = IERR_TOO_MANY_STEPS;
     }
 
     state.time = t;

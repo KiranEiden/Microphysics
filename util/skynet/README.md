@@ -7,12 +7,12 @@ This directory contains:
 NOTE: The "presure" option in the skydata class in compare.py can be
       used if the helmoholtz eos executable for finding pressure is
       located in the directory. The helmholtz eos is freely available
-      from: http://cococubed.asu.edu/code_pages/eos.shtml   
+      from: https://cococubed.com/code_pages/eos.shtml
 
 Quick Start:
   1. Make sure Skynet is installed and working. Be sure to set your
      SKYNET_HOME variable, and to prepend SKYNET_HOME to your
-     PYTHON_PATH. The above depend on importing buit in scripts from
+     PYTHON_PATH. The above depend on importing built-in scripts from
      Skynet, so we need to tell python where to find them.
 
   2. Change desired problem parameters in burn.py as needed.

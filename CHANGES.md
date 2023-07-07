@@ -1,3 +1,34 @@
+# 23.07
+
+  * The preprocessor variable EXTRA_THERMO has been removed.
+    Use cases that depend on dpdA/dpdZ or dedA/dedZ should use
+    eos_extra_t, which is a container that holds all of the
+    entities in eos_t as well as these derivatives wrt A and Z. (#1229)
+
+  * added the ability to scale the energy we integrate by
+    the initial energy in the ODE integration (#1224)
+
+  * added an implementation of the Gershgorin circle theorem
+    for estimating the spectral radius of our ODE system (#1222)
+
+  * removed SDC_EVOLVE_ENTHALPY -- this was not being used (#1204)
+  
+# 23.06
+
+  * Added a new Runge-Kutta-Chebyshev integrator (#1191)
+
+  * Lots of clean-up to the primordial chem network (#1180, #1181
+    #1198)
+
+  * Namespaces for the runtime parameters are now required in C++ (
+
+  * The SDC+NSE update for tabular NSE was fixed -- we were previously
+    computing the energy release incorrectly (#1092)
+
+# 23.05
+
+  * The abort_on_failure runtime parameter has been removed (#1174)
+
 # 23.04
 
   * added preliminary CMake support (#1151, #1164, #1166)
@@ -66,7 +97,7 @@
 
 # 22.11
 
-  * use of the auxillary state to define composition is now enabled
+  * use of the auxiliary state to define composition is now enabled
     via USE_AUX_THERMO and the preprocessor variable AUX_THERMO
     (#1003)
 
@@ -175,7 +206,7 @@
     breakout reactions (#751)
 
   * Some fixes to the NSE bailout in aprox19 (#739, #753, #755) and
-    the relaxation check on the NSE critera (#754)
+    the relaxation check on the NSE criteria (#754)
 
   * Added a new unit test for single-zone SDC (burn_cell_sdc) (#744)
 
@@ -560,7 +591,7 @@
     corresponding inverse from the work of Deboer et al. 2017
     (https://journals.aps.org/rmp/abstract/10.1103/RevModPhys.89.035007).
     To use the new rate, user must set `use_c12ag_deboer17` to `true`.
-    This rate is only useable in the `aprox13`, `aprox19`, `aprox21`,
+    This rate is only usable in the `aprox13`, `aprox19`, `aprox21`,
     and `iso7` reaction rate networks. Closes issue #44.
 
   * a routine util/cj_detonation was added to compute the
@@ -582,7 +613,7 @@
 
    * we now disable some composition derivatives in the EOS
      by default, for performance and memory reasons.  They can
-     be reenabled by defining the preprocessor variable
+     be re-enabled by defining the preprocessor variable
      EXTRA_THERMO (PR #59)
 
 # 17.10

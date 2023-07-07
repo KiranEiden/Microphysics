@@ -6,46 +6,52 @@
 #include <vode_dvjust.H>
 #include <vode_dvnlsd.H>
 
+template <typename BurnT, typename DvodeT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void advance_nordsieck (dvode_t& vstate)
+void advance_nordsieck (BurnT& state, DvodeT& vstate)
 {
+    amrex::ignore_unused(state);
 
     // Effectively multiplies the Nordsieck history
     // array by the Pascal triangle matrix.
 
+    constexpr int int_neqs = integrator_neqs<BurnT>();
+
     for (int k = vstate.NQ; k >= 1; --k) {
         for (int j = k; j <= vstate.NQ; ++j) {
-            for (int i = 1; i <= VODE_NEQS; ++i) {
+            for (int i = 1; i <= int_neqs; ++i) {
                 vstate.yh(i,j) += vstate.yh(i,j+1);
             }
         }
     }
-
 }
 
 
+template <typename BurnT, typename DvodeT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void retract_nordsieck (dvode_t& vstate)
+void retract_nordsieck (BurnT& state, DvodeT& vstate)
 {
+    amrex::ignore_unused(state);
 
     // Undoes the Pascal triangle matrix multiplication
     // implemented in subroutine advance_nordsieck.
 
+    constexpr int int_neqs = integrator_neqs<BurnT>();
+
     for (int k = vstate.NQ; k >= 1; --k) {
         for (int j = k; j <= vstate.NQ; ++j) {
-            for (int i = 1; i <= VODE_NEQS; ++i) {
+            for (int i = 1; i <= int_neqs; ++i) {
                 vstate.yh(i,j) -= vstate.yh(i,j+1);
             }
         }
     }
-
 }
 
 
+template <typename BurnT, typename DvodeT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-int dvstep (burn_t& state, dvode_t& vstate)
+int dvstep (BurnT& state, DvodeT& vstate)
 {
-
     // dvstep performs one step of the integration of an initial value
     // problem for a system of ordinary differential equations.
     // dvstep calls subroutine dvnlsd for the solution of the nonlinear system
@@ -80,6 +86,8 @@ int dvstep (burn_t& state, dvode_t& vstate)
     Real FLOTL, R;
     int NCF, NFLAG;
 
+    constexpr int int_neqs = integrator_neqs<BurnT>();
+
     int kflag = 0;
     TOLD = vstate.tn;
     NCF = 0;
@@ -95,13 +103,13 @@ int dvstep (burn_t& state, dvode_t& vstate)
     if (vstate.NEWH != 0) {
 
         if (vstate.NEWQ < vstate.NQ) {
-            dvjust(-1, vstate);
+            dvjust(-1, state, vstate);
             vstate.NQ = vstate.NEWQ;
             vstate.L = static_cast<short>(vstate.NQ + 1);
             vstate.NQWAIT = vstate.L;
         }
         else if (vstate.NEWQ > vstate.NQ) {
-            dvjust(1, vstate);
+            dvjust(1, state, vstate);
             vstate.NQ = vstate.NEWQ;
             vstate.L = static_cast<short>(vstate.NQ + 1);
             vstate.NQWAIT = vstate.L;
@@ -113,7 +121,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
 
         for (int j = 2; j <= vstate.L; ++j) {
             R *= vstate.ETA;
-            for (int i = 1; i <= VODE_NEQS; ++i) {
+            for (int i = 1; i <= int_neqs; ++i) {
                 vstate.yh(i,j) *= R;
             }
         }
@@ -124,7 +132,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
 
     }
 
-    IArray1D pivot;
+    Array1D<short, 1, int_neqs> pivot;
 
     // Compute the predicted values by effectively
     // multiplying the yh array by the Pascal triangle matrix.
@@ -135,15 +143,15 @@ int dvstep (burn_t& state, dvode_t& vstate)
     // We will use this saved value to determine if any
     // constraints were violated in the update.
 
-    Array1D<Real, 1, VODE_NEQS> y_save;
+    Array1D<Real, 1, int_neqs> y_save;
 #ifdef STRANG
-    for (int i = 1; i <= VODE_NEQS; ++i) {
+    for (int i = 1; i <= int_neqs; ++i) {
         y_save(i) = vstate.y(i);
     }
 #endif
 #ifdef SIMPLIFIED_SDC
     Real rho_old = state.rho_orig + TOLD * state.ydot_a[SRHO];
-    for (int i = 1; i <= VODE_NEQS; ++i) {
+    for (int i = 1; i <= int_neqs; ++i) {
         y_save(i) = vstate.y(i);
     }
     for (int i = 1; i <= NumSpec; ++i) {
@@ -155,7 +163,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
 
         vstate.tn += vstate.H;
 
-        advance_nordsieck(vstate);
+        advance_nordsieck(state, vstate);
 
         dvset(vstate);
 
@@ -179,7 +187,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
             vstate.ETAMAX = 1.0_rt;
             vstate.tn = TOLD;
 
-            retract_nordsieck(vstate);
+            retract_nordsieck(state, vstate);
 
             if (std::abs(vstate.H) <= HMIN * ONEPSM) {
                 kflag = -2;
@@ -199,7 +207,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
 
             for (int j = 2; j <= vstate.L; ++j) {
                 R *= vstate.ETA;
-                for (int i = 1; i <= VODE_NEQS; ++i) {
+                for (int i = 1; i <= int_neqs; ++i) {
                     vstate.yh(i,j) *= R;
                 }
             }
@@ -217,7 +225,6 @@ int dvstep (burn_t& state, dvode_t& vstate)
         bool valid_update = true;
 
 #ifdef SIMPLIFIED_SDC
-#if defined(SDC_EVOLVE_ENERGY)
 	if (vstate.y(SEINT+1) < 0.0_rt) {
 	    valid_update = false;
 	}
@@ -227,7 +234,6 @@ int dvstep (burn_t& state, dvode_t& vstate)
         if (rho_current < 0.0_rt) {
             valid_update = false;
         }
-#endif
 #endif
 
         for (int i = 1; i <= NumSpec; ++i) {
@@ -251,14 +257,14 @@ int dvstep (burn_t& state, dvode_t& vstate)
 
             // Constrain abundances such that they are not negative (within a tolerance)
             // or greater than one (within a tolerance).
-            if (vstate.y(i) < -vode_failure_tolerance) {
+            if (vstate.y(i) < -species_failure_tolerance) {
                 valid_update = false;
             }
 
             // Don't enforce the condition below if
             // vstate.y contains number densities
             if (!use_number_densities) {
-                if (vstate.y(i) > 1.0_rt + vode_failure_tolerance) {
+                if (vstate.y(i) > 1.0_rt + species_failure_tolerance) {
                     valid_update = false;
                 }
             }
@@ -287,15 +293,13 @@ int dvstep (burn_t& state, dvode_t& vstate)
                 break;
             }
 
-#if defined(SDC_EVOLVE_ENERGY)
-            if (vstate.y(SFS+i) < -vode_failure_tolerance * rho_current) {
+            if (vstate.y(SFS+i) < -species_failure_tolerance * rho_current) {
                 valid_update = false;
             }
 
-            if (vstate.y(SFS+i) > (1.0_rt + vode_failure_tolerance) * rho_current) {
+            if (vstate.y(SFS+i) > (1.0_rt + species_failure_tolerance) * rho_current) {
                 valid_update = false;
             }
-#endif
 
 #endif
 
@@ -307,11 +311,11 @@ int dvstep (burn_t& state, dvode_t& vstate)
             //  y(2:2+NumSpec-1) = rho X
             //  y(NumSpec+2) = rho e
 
-            if (vstate.y(1+i) < -vode_failure_tolerance * vstate.y(1)) {
+            if (vstate.y(1+i) < -species_failure_tolerance * vstate.y(1)) {
                 valid_update = false;
             }
 
-            if (vstate.y(1+i) > (1.0_rt + vode_failure_tolerance) * vstate.y(1)) {
+            if (vstate.y(1+i) > (1.0_rt + species_failure_tolerance) * vstate.y(1)) {
                 valid_update = false;
             }
 #endif
@@ -339,14 +343,14 @@ int dvstep (burn_t& state, dvode_t& vstate)
 
             vstate.tau(1) = vstate.H;
             for (int j = 1; j <= vstate.L; ++j) {
-                for (int i = 1; i <= VODE_NEQS; ++i) {
+                for (int i = 1; i <= int_neqs; ++i) {
                     vstate.yh(i,j) += vstate.el(j) * vstate.acor(i);
                 }
             }
 
             vstate.NQWAIT -= 1;
             if ((vstate.L != VODE_LMAX) && (vstate.NQWAIT == 1)) {
-                for (int i = 1; i <= VODE_NEQS; ++i) {
+                for (int i = 1; i <= int_neqs; ++i) {
                     vstate.yh(i,VODE_LMAX) = vstate.acor(i);
                 }
                 vstate.CONP = vstate.tq(5);
@@ -369,7 +373,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
             }
 
             R = 1.0_rt / vstate.tq(2);
-            for (int i = 1; i <= VODE_NEQS; ++i) {
+            for (int i = 1; i <= int_neqs; ++i) {
                 vstate.acor(i) *= R;
             }
 
@@ -388,7 +392,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
         NFLAG = -2;
         vstate.tn = TOLD;
 
-        retract_nordsieck(vstate);
+        retract_nordsieck(state, vstate);
 
         if (std::abs(vstate.H) <= HMIN * ONEPSM) {
             kflag = -1;
@@ -412,7 +416,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
 
             for (int j = 2; j <= vstate.L; ++j) {
                 R *= vstate.ETA;
-                for (int i = 1; i <= VODE_NEQS; ++i) {
+                for (int i = 1; i <= int_neqs; ++i) {
                     vstate.yh(i,j) *= R;
                 }
             }
@@ -439,7 +443,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
 
         if (vstate.NQ != 1) {
             vstate.ETA = amrex::max(ETAMIN, HMIN / std::abs(vstate.H));
-            dvjust(-1, vstate);
+            dvjust(-1, state, vstate);
             vstate.L = vstate.NQ;
             vstate.NQ -= 1;
             vstate.NQWAIT = vstate.L;
@@ -449,7 +453,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
 
             for (int j = 2; j <= vstate.L; ++j) {
                 R *= vstate.ETA;
-                for (int i = 1; i <= VODE_NEQS; ++i) {
+                for (int i = 1; i <= int_neqs; ++i) {
                     vstate.yh(i,j) *= R;
                 }
             }
@@ -468,7 +472,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
         vstate.tau(1) = vstate.H;
         rhs(vstate.tn, state, vstate, vstate.savf);
         vstate.NFE += 1;
-        for (int i = 1; i <= VODE_NEQS; ++i) {
+        for (int i = 1; i <= int_neqs; ++i) {
             vstate.yh(i,2) = vstate.H * vstate.savf(i);
         }
 
@@ -498,10 +502,10 @@ int dvstep (burn_t& state, dvode_t& vstate)
         if (vstate.NQ != 1) {
             // Compute ratio of new H to current H at the current order less one.
             DDN = 0.0_rt;
-            for (int i = 1; i <= VODE_NEQS; ++i) {
+            for (int i = 1; i <= int_neqs; ++i) {
                 DDN += (vstate.yh(i,vstate.L) * vstate.ewt(i)) * (vstate.yh(i,vstate.L) * vstate.ewt(i));
             }
-            DDN = std::sqrt(DDN / VODE_NEQS) / vstate.tq(1);
+            DDN = std::sqrt(DDN / int_neqs) / vstate.tq(1);
             ETAQM1 = 1.0_rt / (std::pow(BIAS1 * DDN, 1.0_rt / (FLOTL - 1.0_rt)) + ADDON);
         }
 
@@ -510,14 +514,14 @@ int dvstep (burn_t& state, dvode_t& vstate)
         if (vstate.L != VODE_LMAX) {
             // Compute ratio of new H to current H at current order plus one.
             CNQUOT = (vstate.tq(5) / vstate.CONP) * std::pow(vstate.H / vstate.tau(2), vstate.L);
-            for (int i = 1; i <= VODE_NEQS; ++i) {
+            for (int i = 1; i <= int_neqs; ++i) {
                 vstate.savf(i) = vstate.acor(i) - CNQUOT * vstate.yh(i,VODE_LMAX);
             }
             DUP = 0.0_rt;
-            for (int i = 1; i <= VODE_NEQS; ++i) {
+            for (int i = 1; i <= int_neqs; ++i) {
                 DUP += (vstate.savf(i) * vstate.ewt(i)) * (vstate.savf(i) * vstate.ewt(i));
             }
-            DUP = std::sqrt(DUP / VODE_NEQS) / vstate.tq(3);
+            DUP = std::sqrt(DUP / int_neqs) / vstate.tq(3);
             ETAQP1 = 1.0_rt / (std::pow(BIAS3 * DUP, 1.0_rt / (FLOTL + 1.0_rt)) + ADDON);
         }
 
@@ -525,7 +529,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
             if (ETAQP1 > ETAQM1) {
                 vstate.ETA = ETAQP1;
                 vstate.NEWQ = static_cast<short>(vstate.NQ + 1);
-                for (int i = 1; i <= VODE_NEQS; ++i) {
+                for (int i = 1; i <= int_neqs; ++i) {
                     vstate.yh(i,VODE_LMAX) = vstate.acor(i);
                 }
             }
@@ -559,7 +563,7 @@ int dvstep (burn_t& state, dvode_t& vstate)
             vstate.ETAMAX = ETAMX2;
         }
         R = 1.0_rt / vstate.tq(2);
-        for (int i = 1; i <= VODE_NEQS; ++i) {
+        for (int i = 1; i <= int_neqs; ++i) {
             vstate.acor(i) *= R;
         }
         return kflag;
@@ -573,12 +577,11 @@ int dvstep (burn_t& state, dvode_t& vstate)
         vstate.ETAMAX = ETAMX2;
     }
     R = 1.0_rt / vstate.tq(2);
-    for (int i = 1; i <= VODE_NEQS; ++i) {
+    for (int i = 1; i <= int_neqs; ++i) {
         vstate.acor(i) *= R;
     }
 
     return kflag;
-
 }
 
 #endif

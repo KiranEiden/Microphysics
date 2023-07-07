@@ -17,6 +17,8 @@
 #include <cctype>
 #include <algorithm>
 
+using namespace nse_rp;
+
 AMREX_INLINE
 void find_rate_indices(amrex::Array1D<int, 1, 3>& reactant_indices,
 		       amrex::Array1D<int, 1, 3>& product_indices, const std::string& rate_name){
@@ -49,26 +51,28 @@ void find_rate_indices(amrex::Array1D<int, 1, 3>& reactant_indices,
 
   // Separate product name from reactant names
 
-  pos = rate_name_mod.find("__");
+  pos = rate_name_mod.find("_to_");
   std::string reactant_names = rate_name_mod.substr(0, pos);
-  std::string product_names = rate_name_mod.substr(pos+2);
-
-  // Remove suffix in the product name
-
-  std::string suffix;
-
-  pos = product_names.find("__");
-  if (pos != std::string::npos){
-    suffix = product_names.substr(pos);
-    product_names.erase(pos);
-  }
+  std::string product_names = rate_name_mod.substr(pos+4);
 
   // check whether if this rate is removed from the network
   // let its reactant and product all to be -1 if rate is removed
 
-  pos = suffix.find("removed");
-  if (pos != std::string::npos){
+  pos = product_names.find("_removed");
+  if (pos != std::string::npos) {
     return;
+  }
+
+  // remove other suffixes
+
+  std::vector<std::string> suffixes {"_approx", "_derived", "_modified"};
+
+  for (std::string suffix : suffixes) {
+    pos = product_names.find(suffix);
+
+    if (pos != std::string::npos) {
+      product_names.erase(pos);
+    }
   }
 
   std::string _temp;
@@ -336,7 +340,7 @@ T get_nse_state(const T& state)
 
 template<typename T>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void fcn_hybrid(Array1D<Real, 1, 2>& x, Array1D<Real, 1, 2>& fvec,
+void fcn(Array1D<Real, 1, 2>& x, Array1D<Real, 1, 2>& fvec,
                 const T& state, int& iflag) {
 
     T current_state = state;
@@ -367,7 +371,7 @@ void fcn_hybrid(Array1D<Real, 1, 2>& x, Array1D<Real, 1, 2>& fvec,
 
 template<typename T>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void jcn_hybrid(Array1D<Real, 1, 2>& x, Array2D<Real, 1, 2, 1, 2>& fjac,
+void jcn(Array1D<Real, 1, 2>& x, Array2D<Real, 1, 2, 1, 2>& fjac,
                 const T& state, int& iflag) {
 
     T current_state = state;
@@ -446,9 +450,10 @@ void nse_hybrid_solver(T& state, amrex::Real eps=1.0e-10_rt) {
 	hj.x(1) = inner_x(1);
 	hj.x(2) = inner_x(2);
 
-	hybrj(hj, state, fcn_hybrid<T>, jcn_hybrid<T>);
+	// hybrj<2, T>(hj, state, fcn_hybrid<T>, jcn_hybrid<T>);
+	hybrj(hj, state);
 
-	fcn_hybrid(hj.x, f, state, flag);
+	fcn(hj.x, f, state, flag);
 
 	if (std::abs(f(1)) < eps && std::abs(f(2)) < eps){
 
@@ -508,8 +513,8 @@ void nse_nr_solver(T& state, amrex::Real eps=1.0e-10_rt) {
   x(1) = state.mu_p;
   x(2) = state.mu_n;
 
-  jcn_hybrid(x, jac, state, flag);
-  fcn_hybrid(x, f, state,flag);
+  jcn(x, jac, state, flag);
+  fcn(x, f, state,flag);
 
   amrex::Real det;                                            // store determinant for finding inverse jac
   amrex::Array2D<amrex::Real, 1, 2, 1, 2> inverse_jac;        // store inverse jacobian
@@ -580,8 +585,8 @@ void nse_nr_solver(T& state, amrex::Real eps=1.0e-10_rt) {
 
     // update constraint
 
-    jcn_hybrid(x, jac, state, flag);
-    fcn_hybrid(x, f, state, flag);
+    jcn(x, jac, state, flag);
+    fcn(x, f, state, flag);
   }
 
   if (!converged){
@@ -596,32 +601,40 @@ T get_actual_nse_state(T& state, amrex::Real eps=1.0e-10_rt,
                        bool input_ye_is_valid=false){
 
   // Check whether initialized or not
-  if (!NSE_INDEX::initialized){
+  if (!NSE_INDEX::initialized) {
     amrex::Error("NSE uninitialized! Need to call init_nse_net() ");
   }
   // Check whether input ye is actually valid
   amrex::Real ye_lo = 1.0_rt;
   amrex::Real ye_hi = 0.0_rt;
 
-  for (int n = 0; n < NumSpec; ++n){
+  for (int n = 0; n < NumSpec; ++n) {
     ye_lo = amrex::min(zion[n] * aion_inv[n], ye_lo);
     ye_hi = amrex::max(zion[n] * aion_inv[n], ye_hi);
   }
 
-  if (state.y_e < ye_lo || state.y_e > ye_hi){
+  if (state.y_e < ye_lo || state.y_e > ye_hi) {
     input_ye_is_valid = false;
   }
 
   if (!input_ye_is_valid) {
     // ensure Ye is valid
+#ifdef STRANG
     composition(state);
+#else
+    state.y_e = 0.0_rt;
+
+    for (int n = 0; n < NumSpec; ++n) {
+      state.y_e += state.y[SFS+n] * zion[n] * aion_inv[n] / state.rho;
+    }
+#endif
   }
 
-  // invoke newton-raphson to solve chemical potential of proton and neutron
+  // invoke newton-raphson or hybrj to solve chemical potential of proton and neutron
   if (use_hybrid_solver) {
     nse_hybrid_solver(state, eps);
   }
-  else{
+  else {
     nse_nr_solver(state, eps);
   }
 

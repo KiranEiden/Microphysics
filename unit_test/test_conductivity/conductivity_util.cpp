@@ -14,6 +14,7 @@
 #include <cmath>
 
 using namespace amrex;
+using namespace unit_test_rp;
 
 void cond_test_C(const Box& bx,
                  const Real dlogrho, const Real dlogT, const Real dmetal,
@@ -29,7 +30,7 @@ void cond_test_C(const Box& bx,
     // set the composition -- approximately solar
     Real metalicity = 0.0 + static_cast<Real> (k) * dmetal;
 
-    eos_t eos_state;
+    eos_extra_t eos_state;
 
     for (int n = 0; n < NumSpec; n++) {
       eos_state.xn[n] = metalicity/(NumSpec - 2);
