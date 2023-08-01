@@ -1,18 +1,10 @@
 CEXE_headers += network_properties.H
 
 ifeq ($(USE_REACT),TRUE)
-
-  CEXE_sources += actual_network_data.cpp
   CEXE_headers += actual_network.H
   CEXE_headers += actual_rhs.H
 
   USE_RATES       = TRUE
   USE_SCREENING   = TRUE
   USE_NEUTRINOS   = TRUE
-
-  ifeq ($(USE_NSE_TABLE),TRUE)
-    CEXE_headers += nse_table.H
-    CEXE_headers += nse_table_check.H
-  endif
-
 endif
