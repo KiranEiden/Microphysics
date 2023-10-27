@@ -27,6 +27,7 @@ struct eos_t:eos_base_t {
     amrex::Real dsdr{};
     amrex::Real dpde{};
     amrex::Real dpdr_e{};
+    amrex::Real G{}; // fundamental derivative (Thompson 1971), we use equation 2.24 of Menikoff & Plohr 1989
 
     amrex::Real cv{};
     amrex::Real cp{};
@@ -108,7 +109,7 @@ struct eos_rep_t:eos_base_t {
 
     amrex::Real abar{};
     amrex::Real zbar{};
-  
+
 #ifdef NSE_NET
     amrex::Real mu_p{};   //chemical potential of proton
     amrex::Real mu_n{};   //chemical potential of neutron
@@ -145,6 +146,7 @@ struct chem_eos_t:eos_base_t {
     amrex::Real dpdr_e{};
     amrex::Real dedT{};
     amrex::Real dedr{};
+    amrex::Real G{};
 
     amrex::Real mu{};
     amrex::Real cs{};
@@ -194,6 +196,14 @@ struct has_dpdA
 
 template <typename T>
 struct has_dpdA<T, decltype((void)T::dpdA, void())>
+    : std::true_type {};
+
+template <typename T, typename Enable = void>
+struct has_G
+    : std::false_type {};
+
+template <typename T>
+struct has_G<T, decltype((void)T::G, void())>
     : std::true_type {};
 
 template <typename T, typename Enable = void>
