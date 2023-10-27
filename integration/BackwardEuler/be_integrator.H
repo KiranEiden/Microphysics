@@ -4,14 +4,16 @@
 #include <be_type.H>
 #include <network.H>
 #include <actual_network.H>
+#ifndef NEW_NETWORK_IMPLEMENTATION
 #include <actual_rhs.H>
+#endif
 #include <burn_type.H>
 #include <linpack.H>
 #include <numerical_jacobian.H>
 #ifdef STRANG
 #include <integrator_rhs_strang.H>
 #endif
-#ifdef SIMPLIFIED_SDC
+#ifdef SDC
 #include <integrator_rhs_simplified_sdc.H>
 #endif
 #include <integrator_data.H>
@@ -171,7 +173,7 @@ int be_integrator (BurnT& state, BeT& be)
 
     be.n_rhs += 1;
 
-    Real dt_sub = initial_dt(state, be, ydot);
+    Real dt_sub = initial_react_dt(state, be, ydot);
 
     // main timestepping loop
 
