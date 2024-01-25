@@ -1,3 +1,58 @@
+# 24.01
+
+   * The quantum corrections for the Chabrier screening are
+     now optional (#1428)
+
+   * We've replaced std::pow() with amrex::Math::powi for integer
+     powers for better GPU performance (#1432)
+
+   * `in_nse` now works with an `eos_t` for tabular NSE (#1424)
+
+   * There are a new set of interfaces for inverting the EOS when
+     we are in NSE (with the tabular NSE) that consistently find
+     T and the composition (#1405, #1430)
+
+   * The NSE table now uses finer spacing (#1427)
+
+   * The SDC+NSE update for tabular NSE is now based on a 2nd-order
+     Runge-Kutta method (#1415)
+
+   * An additional check on molar fractions was added to
+     self-consistent NSE to determine if we are in NSE (#1417)
+
+   * The NSE table interface was changed (#1404, #1418)
+
+   * A script that checks if a network is compatible with
+     self-consistent NSE was added (#1416)
+
+   * constant T evolution was fixed (#1408)
+
+   * An unsafe reinterpret_cast was removed from linear algebra (#1412)
+
+   * Methods for computing T derivatives of an NSE table quantity were
+     added (#1407)
+
+# 23.12
+
+  * The SDC+NSE update now includes plasma neutrino losses (#1357,
+    #1400)
+
+  * The default tabular NSE interpolation is now cubic (#1399)
+
+  * Self-consistent NSE now requires chabrier1998 or null screening
+    (#1398)
+
+  * A new network, subch_base, was added that further simplifies
+    subch_simple (#1393)
+
+  * A slightly larger network for Urca was added (#1365)
+
+  * A new NSE table was added.  This is generated via pynucastro and
+    there is a python script that can be used to regenerate it (#1350)
+
+  * A bug was fixed in the neutrino cooling that was introduced in an
+    optimization last release (#1380)
+
 # 23.11
 
   * The sneut5 neutrino cooling term was cleaned up (#1371, #1372,

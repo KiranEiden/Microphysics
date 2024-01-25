@@ -596,7 +596,7 @@ void nu_plasma(const sneutf_t& sf,
 
         a1 = 0.39e0_rt - 1.25e0_rt * xnum - 0.35e0_rt * std::sin(4.5e0_rt * xnum);
 
-        b1 = 0.3e0_rt * std::exp(-std::pow(4.5e0_rt*xnum + 0.9e0_rt, 2.0_rt));
+        b1 = 0.3e0_rt * std::exp(-amrex::Math::powi<2>(4.5e0_rt*xnum + 0.9e0_rt));
 
         c = amrex::min(0.0e0_rt, xden - 1.6e0_rt + 1.25e0_rt * xnum);
 
@@ -1178,19 +1178,19 @@ void nu_brem(const sneutf_t& sf,
         const auto [sin1, cos1] = amrex::Math::sincos(u);
 
         // double, triple, etc. angle formulas
-        // sin/cos (2 fac1 tau)
+        // sin/cos (2 u)
         const Real sin2 = 2.0_rt * sin1 * cos1;
         const Real cos2 = 2.0_rt * cos1 * cos1 - 1.0_rt;
 
-        // sin/cos (3 fac1 tau)
+        // sin/cos (3 u)
         const Real sin3 = sin1 * (3.0_rt - 4.0_rt * sin1 * sin1);
         const Real cos3 = cos1 * (4.0_rt * cos1 * cos1 - 3.0_rt);
 
-        // sin/cos (4 fac1 tau) -- use double angle on sin2/cos2
+        // sin/cos (4 u) -- use double angle on sin2/cos2
         const Real sin4 = 2.0_rt * sin2 * cos2;
         const Real cos4 = 2.0_rt * cos2 * cos2 - 1.0_rt;
 
-        // sin/cos (5 fac1 tau)
+        // sin/cos (5 u)
         //const Real sin5 = sin1 * (5.0_rt - sin1 * sin1 * (20.0_rt - 16.0_rt * sin1 * sin1));
         const Real cos5 = cos1 * (cos1 * cos1 * (16.0_rt * cos1 * cos1 - 20.0_rt) + 5.0_rt);
 
@@ -1425,7 +1425,7 @@ void nu_recomb(const sneutf_t& sf,
         a1    = 1.0e0_rt/dum;
         a2    = 1.0e0_rt/bigj;
 
-        sreco   = nu_constants::tfac6 * 2.649e-18_rt * sf.ye * std::pow(sf.zbar, 13.0_rt) * sf.den * bigj * a1;
+        sreco   = nu_constants::tfac6 * 2.649e-18_rt * sf.ye * amrex::Math::powi<13>(sf.zbar) * sf.den * bigj * a1;
         if constexpr (do_derivatives) {
             srecodt = sreco * (bigjdt * a2 - z * (zetadt + nudt) * a1);
             srecoda = sreco * (-1.0e0_rt * sf.abari + bigjda * a2 - z * (zetada + nuda) * a1);
