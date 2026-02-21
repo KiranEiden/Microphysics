@@ -1,3 +1,6 @@
+#include <AMReX_BLassert.H>
+#include <extern_parameters.H>
+
 #ifdef REACTIONS
 #include <actual_network.H>
 #ifdef NEW_NETWORK_IMPLEMENTATION
@@ -12,13 +15,16 @@
 #include <nse_solver.H>
 #endif
 #endif
+#ifdef NSE_TABLE
+#include <nse_table.H>
+#endif
 
 void network_init()
 {
 
 #ifdef REACTIONS
 #ifdef NONAKA_PLOT
-nonaka_init();
+    nonaka_init();
 #endif
 #ifdef NEW_NETWORK_IMPLEMENTATION
     actual_network_init();
@@ -28,6 +34,14 @@ nonaka_init();
     actual_rhs_init();
 #endif
 
+#ifdef NSE_TABLE
+    // read in the NSE table (if there is one)
+    init_nse();
 #endif
+    // some safety checks
+    AMREX_ALWAYS_ASSERT(integrator_rp::ode_max_steps > 0);
+
+#endif // REACTIONS
+
 
 }

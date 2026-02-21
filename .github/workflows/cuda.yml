@@ -8,10 +8,10 @@ concurrency:
 
 jobs:
   cuda-compile:
-    name: CUDA@11.7 GCC
-    runs-on: ubuntu-22.04
+    name: CUDA@12.9 GCC
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: Get AMReX
         run: |
@@ -26,23 +26,23 @@ jobs:
           cd ../..
 
       - name: Dependencies
-        run: .github/workflows/dependencies/dependencies_nvcc11.sh
+        run: .github/workflows/dependencies/dependencies_nvcc.sh 12.9
 
       - name: compile test_react (aprox13)
         run: |
           export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
           cd unit_test/test_react
-          make NETWORK_DIR=aprox13 USE_CUDA=TRUE COMP=gnu USE_MPI=FALSE -j 2
+          make NETWORK_DIR=aprox13 USE_CUDA=TRUE COMP=gnu USE_MPI=FALSE -j 4
 
       - name: compile test_react (ignition_reaclib/URCA-simple)
         run: |
           export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
           cd unit_test/test_react
           make realclean
-          make NETWORK_DIR=ignition_reaclib/URCA-simple USE_CUDA=TRUE COMP=gnu USE_MPI=FALSE -j 2
+          make NETWORK_DIR=ignition_reaclib/URCA-simple USE_CUDA=TRUE COMP=gnu USE_MPI=FALSE -j 4
 
-      - name: compile test_ase (ase)
+      - name: compile nse_net_cell (ase)
         run: |
           export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-          cd unit_test/test_ase
-          make USE_CUDA=TRUE COMP=gnu USE_MPI=FALSE -j 2
+          cd unit_test/nse_net_cell
+          make USE_CUDA=TRUE COMP=gnu USE_MPI=FALSE -j 4

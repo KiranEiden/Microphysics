@@ -7,23 +7,7 @@ include $(MICROPHYSICS_UTIL_PATH)/Make.package
 
 ifeq ($(USE_REACT), TRUE)
 
-  # for backwards compatibility
-  DEFINES += -DNETWORK_HAS_CXX_IMPLEMENTATION
-
-  ifeq ($(INTEGRATOR_DIR), VODE90)
-    override INTEGRATOR_DIR = VODE
-    $(warning VODE90 has been renamed VODE)
-  endif
-
-  ifeq ($(INTEGRATOR_DIR), VODE)
-    ifeq ($(USE_CLEANED_CORRECTOR), TRUE)
-      DEFINES += -DCLEAN_INTEGRATOR_CORRECTION
-    endif
-  endif
-
   VPATH_LOCATIONS += $(MICROPHYSICS_HOME)/networks
-
-  CEXE_headers += rate_type.H
 
   CEXE_headers += rhs.H
   CEXE_sources += rhs.cpp
@@ -78,6 +62,12 @@ ifeq ($(USE_NSE_TABLE), TRUE)
 
 endif
 
+ifeq ($(USE_NSE_NET),TRUE)
+  ifneq ($(PYNUCASTRO_NETWORK),TRUE)
+    $(error USE_NSE_NET can only be used with pynucastro generated networks)
+  endif
+endif
+
 ifeq ($(USE_NEUTRINOS), TRUE)
 
   NEUTRINO_PATH := $(MICROPHYSICS_HOME)/neutrinos
@@ -100,8 +90,6 @@ AUTO_BUILD_SOURCES += $(NETWORK_OUTPUT_PATH)/network_properties.H
 net_prop_debug: $(NETWORK_OUTPUT_PATH)/network_properties.H
 
 ifneq ($(NETWORK_DIR), general_null)
-  $(NETWORK_OUTPUT_PATH)/network_properties.F90: $(NETWORK_OUTPUT_PATH)/network_properties.H
-
   NAUX := $(shell PYTHONPATH=$(MICROPHYSICS_HOME)/networks/general_null $(MICROPHYSICS_HOME)/networks/get_naux.py --microphysics_path "$(MICROPHYSICS_HOME)" --defines "$(DEFINES)" --net "$(NETWORK_DIR)")
   DEFINES += "-DNAUX_NET=$(NAUX)"
 

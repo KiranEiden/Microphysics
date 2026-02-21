@@ -21,10 +21,10 @@ void dvjust (int IORD, BurnT& state, DvodeT& vstate)
         return;
     }
 
-    int NQM1 = vstate.NQ - 1;
-    int NQM2 = vstate.NQ - 2;
+    const int NQM1 = vstate.NQ - 1;
+    const int NQM2 = vstate.NQ - 2;
 
-    Real HSUM, XI, ALPH0, ALPH1, PROD, XIOLD, T1;
+    amrex::Real XI{};
 
     // Check to see if the order is being increased or decreased.
 
@@ -35,13 +35,13 @@ void dvjust (int IORD, BurnT& state, DvodeT& vstate)
             vstate.el(j) = 0.0_rt;
         }
         vstate.el(3) = 1.0_rt;
-        HSUM = 0.0_rt;
+        amrex::Real HSUM = 0.0_rt;
         for (int j = 1; j <= NQM2; ++j) {
             // Construct coefficients of x*x*(x+xi(1))*...*(x+xi(j)).
             HSUM += vstate.tau(j);
             XI = HSUM / vstate.HSCAL;
             for (int iback = 1; iback <= j+1; ++iback) {
-                int i = (j + 4) - iback;
+                const int i = (j + 4) - iback;
                 vstate.el(i) = vstate.el(i) * XI + vstate.el(i-1);
             }
         }
@@ -62,11 +62,11 @@ void dvjust (int IORD, BurnT& state, DvodeT& vstate)
         }
 
         vstate.el(3) = 1.0_rt;
-        ALPH0 = -1.0_rt;
-        ALPH1 = 1.0_rt;
-        PROD = 1.0_rt;
-        XIOLD = 1.0_rt;
-        HSUM = vstate.HSCAL;
+        amrex::Real ALPH0 = -1.0_rt;
+        amrex::Real ALPH1 = 1.0_rt;
+        amrex::Real PROD = 1.0_rt;
+        amrex::Real XIOLD = 1.0_rt;
+        amrex::Real HSUM = vstate.HSCAL;
 
         if (vstate.NQ != 1) {
             for (int j = 1; j <= NQM1; ++j) {
@@ -84,7 +84,7 @@ void dvjust (int IORD, BurnT& state, DvodeT& vstate)
             }
         }
 
-        T1 = (-ALPH0 - ALPH1) / PROD;
+        amrex::Real T1 = (-ALPH0 - ALPH1) / PROD;
         // Load column L + 1 in YH array.
         for (int i = 1; i <= int_neqs; ++i) {
             vstate.yh(i,vstate.L+1) = T1 * vstate.yh(i,VODE_LMAX);

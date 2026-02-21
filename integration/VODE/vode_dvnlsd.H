@@ -7,27 +7,27 @@
 #endif
 #include <vode_dvjac.H>
 
-template <typename IArray1D, typename BurnT, typename DvodeT>
+template <typename BurnT, typename DvodeT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-Real dvnlsd (IArray1D& pivot, int& NFLAG, BurnT& state, DvodeT& vstate)
+amrex::Real dvnlsd (int& NFLAG, BurnT& state, DvodeT& vstate)
 {
     constexpr int int_neqs = integrator_neqs<BurnT>();
 
-    Real ACNRM = 1.e10_rt;
+    amrex::Real ACNRM = 1.e10_rt;
 
     // dvnlsd is a nonlinear system solver that uses a chord (modified
     // Newton) method with direct linear algebraic system solvers.
     // It then handles the corrector phase of this integration package.
 
     // Parameter declarations
-    const Real CCMAX = 0.3e0_rt;
-    const Real CRDOWN = 0.3e0_rt;
-    const Real RDIV  = 2.0e0_rt;
-    const int MAXCOR = 3;
-    const int MSBP = 20;
+    constexpr amrex::Real CCMAX = 0.3e0_rt;
+    constexpr amrex::Real CRDOWN = 0.3e0_rt;
+    constexpr amrex::Real RDIV  = 2.0e0_rt;
+    constexpr int MAXCOR = 3;
+    constexpr int MSBP = 20;
 
-    Real DEL;
-    int M;
+    amrex::Real DEL{};
+    int M{};
 
     // On the first step, on a change of method order, or after a
     // nonlinear convergence failure with NFLAG = -2, set IPUP = 1
@@ -46,7 +46,7 @@ Real dvnlsd (IArray1D& pivot, int& NFLAG, BurnT& state, DvodeT& vstate)
     // In any case, DVJAC is called at least every MSBP steps.
 
     vstate.DRC = std::abs(vstate.RC - 1.0_rt);
-    if (vstate.DRC > CCMAX || vstate.NST >= vstate.NSLP + MSBP) {
+    if (vstate.DRC > CCMAX || vstate.n_step >= vstate.NSLP + MSBP) {
         vstate.IPUP = 1;
     }
 
@@ -60,14 +60,14 @@ Real dvnlsd (IArray1D& pivot, int& NFLAG, BurnT& state, DvodeT& vstate)
     while (true) {
 
         M = 0;
-        Real DELP = 0.0_rt;
+        amrex::Real DELP = 0.0_rt;
 
         for (int i = 1; i <= int_neqs; ++i) {
             vstate.y(i) = vstate.yh(i,1);
         }
 
         rhs(vstate.tn, state, vstate, vstate.savf);
-        vstate.NFE += 1;
+        vstate.n_rhs += 1;
 
         if (vstate.IPUP == 1) {
 
@@ -75,13 +75,14 @@ Real dvnlsd (IArray1D& pivot, int& NFLAG, BurnT& state, DvodeT& vstate)
             // preprocessed before starting the corrector iteration.  IPUP is set
             // to 0 as an indicator that this has been done.
 
-            int IERPJ;
-            dvjac(pivot, IERPJ, state, vstate);
+            int IERPJ{};
+            dvjac(IERPJ, state, vstate);
+
             vstate.IPUP = 0;
             vstate.RC = 1.0_rt;
             vstate.DRC = 0.0_rt;
             vstate.CRATE = 1.0_rt;
-            vstate.NSLP = vstate.NST;
+            vstate.NSLP = vstate.n_step;
 
             // If matrix is singular, take error return to force cut in step size.
             if (IERPJ != 0) {
@@ -114,11 +115,17 @@ Real dvnlsd (IArray1D& pivot, int& NFLAG, BurnT& state, DvodeT& vstate)
 #ifdef NEW_NETWORK_IMPLEMENTATION
             RHS::dgesl(vstate.jac, vstate.y);
 #else
-            dgesl<int_neqs>(vstate.jac, pivot, vstate.y);
+            if (integrator_rp::linalg_do_pivoting == 1) {
+                constexpr bool allow_pivot{true};
+                dgesl<int_neqs, allow_pivot>(vstate.jac, vstate.pivot, vstate.y);
+            } else {
+                constexpr bool allow_pivot{false};
+                dgesl<int_neqs, allow_pivot>(vstate.jac, vstate.pivot, vstate.y);
+            }
 #endif
 
             if (vstate.RC != 1.0_rt) {
-                Real CSCALE = 2.0_rt / (1.0_rt + vstate.RC);
+                const amrex::Real CSCALE = 2.0_rt / (1.0_rt + vstate.RC);
                 for (int i = 1; i <= int_neqs; ++i) {
                     vstate.y(i) *= CSCALE;
                 }
@@ -138,6 +145,36 @@ Real dvnlsd (IArray1D& pivot, int& NFLAG, BurnT& state, DvodeT& vstate)
                 vstate.y(i) = vstate.yh(i,1) + vstate.acor(i);
             }
 
+            // sometime VODE goes way off tangent.  If these mass fractions
+            // are really bad, then let's just bail now
+
+            if (integrator_rp::do_corrector_validation && !integrator_rp::use_number_densities) {
+#ifdef SDC
+                const amrex::Real rho_current = state.rho_orig + vstate.tn * state.ydot_a[SRHO];
+                const amrex::Real thresh = species_failure_tolerance * rho_current;
+#else
+                const amrex::Real thresh = species_failure_tolerance;
+#endif
+                bool fail{};
+                for (int i = 1; i <= NumSpec; ++i) {
+                    if (vstate.y(i) < -thresh) {
+                        fail = true;
+                        break;
+                    }
+                }
+
+                // this resets the flags in the same fashion as is done above
+                // for a singular matrix.  ICF = 2 means "unrecoverable error",
+                // IPUP = 1 forces a Jacobian reevaluation.  The return value,
+                // ACNRM is ignored in this case (since NFLAG != 0)
+                if (fail) {
+                    NFLAG = -1;
+                    vstate.ICF = 2;
+                    vstate.IPUP = 1;
+                    return ACNRM;
+                }
+            }
+
             // Test for convergence. If M > 0, an estimate of the convergence
             // rate constant is stored in CRATE, and this is used in the test.
 
@@ -145,7 +182,7 @@ Real dvnlsd (IArray1D& pivot, int& NFLAG, BurnT& state, DvodeT& vstate)
                 vstate.CRATE = amrex::max(CRDOWN * vstate.CRATE, DEL / DELP);
             }
 
-            Real DCON = DEL * amrex::min(1.0_rt, vstate.CRATE) / vstate.tq(4);
+            const amrex::Real DCON = DEL * amrex::min(1.0_rt, vstate.CRATE) / vstate.tq(4);
             if (DCON <= 1.0_rt) {
                 // we converged, exit the outer loop
                 converged = true;
@@ -165,7 +202,7 @@ Real dvnlsd (IArray1D& pivot, int& NFLAG, BurnT& state, DvodeT& vstate)
 
             DELP = DEL;
             rhs(vstate.tn, state, vstate, vstate.savf);
-            vstate.NFE += 1;
+            vstate.n_rhs += 1;
 
         }
 

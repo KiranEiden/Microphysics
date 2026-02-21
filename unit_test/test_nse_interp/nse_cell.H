@@ -1,39 +1,45 @@
+#ifndef NSE_CELL_H
+#define NSE_CELL_H
 
 #include <extern_parameters.H>
 #include <eos.H>
 #include <network.H>
 #include <burner.H>
-#include <fstream>
 #include <iostream>
 
 #include <nse_table.H>
 #include <nse_table_type.H>
 #include <nse_eos.H>
 
+AMREX_INLINE
 void nse_cell_c()
 {
 
-    using namespace unit_test_rp;
-
-    std::cout << "rho, T, Ye = " << density << " " << temperature << " " << ye << std::endl;
+    std::cout << "rho, T, Ye = "
+              << unit_test_rp::density << " "
+              << unit_test_rp::temperature << " "
+              << unit_test_rp::ye << std::endl;
 
     // check the indices
 
-    Real logrho = std::log10(density);
-    Real logT = std::log10(temperature);
+    amrex::Real logrho = std::log10(unit_test_rp::density);
+    amrex::Real logT = std::log10(unit_test_rp::temperature);
 
     int ir0 = nse_get_logrho_index(logrho);
     int it0 = nse_get_logT_index(logT);
-    int ic0 = nse_get_ye_index(ye);
+    int ic0 = nse_get_ye_index(unit_test_rp::ye);
 
     std::cout << "density value brackets: "
-              << nse_table_logrho(ir0) << " < " << logrho << " < " << nse_table_logrho(ir0+1) << std::endl;
+              << nse_table_logrho(ir0) << " < " << logrho << " < "
+              << nse_table_logrho(ir0+1) << std::endl;
 
     std::cout << "temperature value brackets: "
-              << nse_table_logT(it0) << " < " << logT << " < " << nse_table_logT(it0+1) << std::endl;
+              << nse_table_logT(it0) << " < " << logT << " < "
+              << nse_table_logT(it0+1) << std::endl;
 
     std::cout << "Ye value brackets: "
-              << nse_table_ye(ic0) << " < " << ye << " < " << nse_table_ye(ic0+1) << std::endl;
+              << nse_table_ye(ic0) << " < " << unit_test_rp::ye << " < "
+              << nse_table_ye(ic0+1) << std::endl;
 
     std::cout << std::endl;
 
@@ -50,29 +56,29 @@ void nse_cell_c()
     ic0 = amrex::max(1, amrex::min(nse_table_size::nye-3, ic0));
 
 
-    Real rhos[] = {nse_table_logrho(ir0),
-                   nse_table_logrho(ir0+1),
-                   nse_table_logrho(ir0+2),
-                   nse_table_logrho(ir0+3)};
+    amrex::Real rhos[] = {nse_table_logrho(ir0),
+                          nse_table_logrho(ir0+1),
+                          nse_table_logrho(ir0+2),
+                          nse_table_logrho(ir0+3)};
 
-    Real Ts[] = {nse_table_logT(it0),
-                 nse_table_logT(it0+1),
-                 nse_table_logT(it0+2),
-                 nse_table_logT(it0+3)};
+    amrex::Real Ts[] = {nse_table_logT(it0),
+                        nse_table_logT(it0+1),
+                        nse_table_logT(it0+2),
+                        nse_table_logT(it0+3)};
 
-    Real yes[] = {nse_table_ye(ic0),
-                  nse_table_ye(ic0+1),
-                  nse_table_ye(ic0+2),
-                  nse_table_ye(ic0+3)};
+    amrex::Real yes[] = {nse_table_ye(ic0),
+                         nse_table_ye(ic0+1),
+                         nse_table_ye(ic0+2),
+                         nse_table_ye(ic0+3)};
 
 
     {
         std::cout << "4 rho values: " << std::endl;
 
-        Real _d[] = {nse_table::abartab(nse_idx(ir0, it0, ic0)),
-                     nse_table::abartab(nse_idx(ir0+1, it0, ic0)),
-                     nse_table::abartab(nse_idx(ir0+2, it0, ic0)),
-                     nse_table::abartab(nse_idx(ir0+3, it0, ic0))};
+        amrex::Real _d[] = {nse_table::abartab(nse_idx(ir0, it0, ic0)),
+                            nse_table::abartab(nse_idx(ir0+1, it0, ic0)),
+                            nse_table::abartab(nse_idx(ir0+2, it0, ic0)),
+                            nse_table::abartab(nse_idx(ir0+3, it0, ic0))};
 
         for (int ii = 0; ii < 4; ++ii) {
             std::cout << rhos[ii] << " " << _d[ii] << std::endl;
@@ -86,10 +92,10 @@ void nse_cell_c()
     {
         std::cout << "4 T values: " << std::endl;
 
-        Real _d[] = {nse_table::abartab(nse_idx(ir0, it0, ic0)),
-                     nse_table::abartab(nse_idx(ir0, it0+1, ic0)),
-                     nse_table::abartab(nse_idx(ir0, it0+2, ic0)),
-                     nse_table::abartab(nse_idx(ir0, it0+3, ic0))};
+        amrex::Real _d[] = {nse_table::abartab(nse_idx(ir0, it0, ic0)),
+                            nse_table::abartab(nse_idx(ir0, it0+1, ic0)),
+                            nse_table::abartab(nse_idx(ir0, it0+2, ic0)),
+                            nse_table::abartab(nse_idx(ir0, it0+3, ic0))};
 
         for (int ii = 0; ii < 4; ++ii) {
             std::cout << Ts[ii] << " " << _d[ii] << std::endl;
@@ -104,10 +110,10 @@ void nse_cell_c()
     {
         std::cout << "4 Ye values: " << std::endl;
 
-        Real _d[] = {nse_table::abartab(nse_idx(ir0, it0, ic0)),
-                     nse_table::abartab(nse_idx(ir0, it0, ic0+1)),
-                     nse_table::abartab(nse_idx(ir0, it0, ic0+2)),
-                     nse_table::abartab(nse_idx(ir0, it0, ic0+3))};
+        amrex::Real _d[] = {nse_table::abartab(nse_idx(ir0, it0, ic0)),
+                            nse_table::abartab(nse_idx(ir0, it0, ic0+1)),
+                            nse_table::abartab(nse_idx(ir0, it0, ic0+2)),
+                            nse_table::abartab(nse_idx(ir0, it0, ic0+3))};
 
         for (int ii = 0; ii < 4; ++ii) {
             std::cout << yes[ii] << " " << _d[ii] << std::endl;
@@ -115,23 +121,22 @@ void nse_cell_c()
         std::cout << std::endl;
 
         std::cout << "cubic interpolated value: " <<
-            cubic(yes, _d, -nse_table_size::dye, ye) << std::endl << std::endl;
+            cubic(yes, _d, -nse_table_size::dye, unit_test_rp::ye) << std::endl << std::endl;
 
     }
 
     std::cout << "tricubic interpolated values: " << std::endl;
 
     nse_table_t nse_state;
-    nse_state.T = temperature;
-    nse_state.rho = density;
-    nse_state.Ye = ye;
+    nse_state.T = unit_test_rp::temperature;
+    nse_state.rho = unit_test_rp::density;
+    nse_state.Ye = unit_test_rp::ye;
 
     nse_interp(nse_state);
 
     std::cout << "abar    = " << nse_state.abar << std::endl;
     std::cout << "bea     = " << nse_state.bea << std::endl;
     std::cout << "dyedt   = " << nse_state.dyedt << std::endl;
-    std::cout << "dabardt = " << nse_state.dabardt << std::endl;
     std::cout << "dbeadt = " << nse_state.dbeadt << std::endl;
     std::cout << "e_nu    = " << nse_state.e_nu << std::endl;
     for (int n = 0; n < NumSpec; ++n) {
@@ -146,17 +151,17 @@ void nse_cell_c()
 
     std::cout << "first finite-difference derivatives" << std::endl;
 
-    nse_state.T = temperature;
-    nse_state.rho = density;
-    nse_state.Ye = ye;
+    nse_state.T = unit_test_rp::temperature;
+    nse_state.rho = unit_test_rp::density;
+    nse_state.Ye = unit_test_rp::ye;
 
     nse_interp(nse_state);
 
-    Real abar_old = nse_state.abar;
-    Real bea_old = nse_state.bea;
-    Real T_old = nse_state.T;
+    amrex::Real abar_old = nse_state.abar;
+    amrex::Real bea_old = nse_state.bea;
+    amrex::Real T_old = nse_state.T;
 
-    const Real eps = 1.e-8_rt;
+    const amrex::Real eps = 1.e-8_rt;
     nse_state.T *= (1.0_rt + eps);
 
     nse_interp(nse_state);
@@ -166,10 +171,10 @@ void nse_cell_c()
 
     std::cout << "now using derivative of the interpolant" << std::endl;
 
-    Real dabardT = nse_interp_dT(temperature, density, ye,
+    amrex::Real dabardT = nse_interp_dT(unit_test_rp::temperature, unit_test_rp::density, unit_test_rp::ye,
                                  nse_table::abartab);
 
-    Real dbeadT = nse_interp_dT(temperature, density, ye,
+    amrex::Real dbeadT = nse_interp_dT(unit_test_rp::temperature, unit_test_rp::density, unit_test_rp::ye,
                                  nse_table::beatab);
 
     std::cout << "dAbar/dT = " << dabardT << std::endl;
@@ -184,13 +189,13 @@ void nse_cell_c()
 
     std::cout << "first finite-difference derivatives" << std::endl;
 
-    nse_state.T = temperature;
-    nse_state.rho = density;
-    nse_state.Ye = ye;
+    nse_state.T = unit_test_rp::temperature;
+    nse_state.rho = unit_test_rp::density;
+    nse_state.Ye = unit_test_rp::ye;
 
     nse_interp(nse_state);
 
-    Real rho_old = nse_state.rho;
+    amrex::Real rho_old = nse_state.rho;
 
     nse_state.rho *= (1.0_rt + eps);
 
@@ -201,10 +206,10 @@ void nse_cell_c()
 
     std::cout << "now using derivative of the interpolant" << std::endl;
 
-    Real dabardrho = nse_interp_drho(temperature, density, ye,
+    amrex::Real dabardrho = nse_interp_drho(unit_test_rp::temperature, unit_test_rp::density, unit_test_rp::ye,
                                      nse_table::abartab);
 
-    Real dbeadrho = nse_interp_drho(temperature, density, ye,
+    amrex::Real dbeadrho = nse_interp_drho(unit_test_rp::temperature, unit_test_rp::density, unit_test_rp::ye,
                                     nse_table::beatab);
 
     std::cout << "dAbar/drho = " << dabardrho << std::endl;
@@ -240,29 +245,29 @@ void nse_cell_c()
 
         // first get the abar consistent with our inputs and find e
 
-        nse_state.T = temperature;
-        nse_state.rho = density;
-        nse_state.Ye = ye;
+        nse_state.T = unit_test_rp::temperature;
+        nse_state.rho = unit_test_rp::density;
+        nse_state.Ye = unit_test_rp::ye;
 
         nse_interp(nse_state);
 
-        Real abar_orig = nse_state.abar;
+        amrex::Real abar_orig = nse_state.abar;
 
         eos_t eos_state;
 
-        eos_state.T = temperature;
-        eos_state.rho = density;
+        eos_state.T = unit_test_rp::temperature;
+        eos_state.rho = unit_test_rp::density;
         eos_state.aux[iye] = nse_state.Ye;
         eos_state.aux[iabar] = nse_state.abar;
 
         eos(eos_input_rt, eos_state);
 
-        Real e_orig = eos_state.e;
+        amrex::Real e_orig = eos_state.e;
 
         // now perturb e and find T, then redo NSE to get abar and finally
         // see if we get back our new e
 
-        Real e_new = eos_state.e * 1.05;
+        amrex::Real e_new = eos_state.e * 1.05;
 
         eos_state.e = e_new;
         eos(eos_input_re, eos_state);
@@ -279,13 +284,13 @@ void nse_cell_c()
         // now we try the new interface.  This effectively does:
         // e', rho, Ye -> Abar', T'
 
-        eos_state.T = temperature;
+        eos_state.T = unit_test_rp::temperature;
         eos_state.e = e_new;
-        eos_state.rho = density;
-        eos_state.aux[iye] = ye;
+        eos_state.rho = unit_test_rp::density;
+        eos_state.aux[iye] = unit_test_rp::ye;
         eos_state.aux[iabar] = abar_orig;
 
-        Real abar_start = eos_state.aux[iabar];
+        amrex::Real abar_start = eos_state.aux[iabar];
 
         nse_T_abar_from_e(eos_state.rho, eos_state.e, eos_state.aux[iye],
                           eos_state.T, eos_state.aux[iabar]);
@@ -306,29 +311,29 @@ void nse_cell_c()
 
         // now redo it for pressure
 
-        nse_state.T = temperature;
-        nse_state.rho = density;
-        nse_state.Ye = ye;
+        nse_state.T = unit_test_rp::temperature;
+        nse_state.rho = unit_test_rp::density;
+        nse_state.Ye = unit_test_rp::ye;
 
         nse_interp(nse_state);
 
-        Real abar_orig = nse_state.abar;
+        amrex::Real abar_orig = nse_state.abar;
 
         eos_t eos_state;
 
-        eos_state.T = temperature;
-        eos_state.rho = density;
+        eos_state.T = unit_test_rp::temperature;
+        eos_state.rho = unit_test_rp::density;
         eos_state.aux[iye] = nse_state.Ye;
         eos_state.aux[iabar] = nse_state.abar;
 
         eos(eos_input_rt, eos_state);
 
-        Real p_orig = eos_state.p;
+        amrex::Real p_orig = eos_state.p;
 
         // now perturb p and find T, then redo NSE to get abar and finally
         // see if we get back our new p
 
-        Real p_new = eos_state.p * 1.05;
+        amrex::Real p_new = eos_state.p * 1.05;
 
         eos_state.p = p_new;
         eos(eos_input_rp, eos_state);
@@ -345,13 +350,13 @@ void nse_cell_c()
         // now we try the new interface.  This effectively does:
         // p', rho, Ye -> Abar', T'
 
-        eos_state.T = temperature;
+        eos_state.T = unit_test_rp::temperature;
         eos_state.p = p_new;
-        eos_state.rho = density;
-        eos_state.aux[iye] = ye;
+        eos_state.rho = unit_test_rp::density;
+        eos_state.aux[iye] = unit_test_rp::ye;
         eos_state.aux[iabar] = abar_orig;
 
-        Real abar_start = eos_state.aux[iabar];
+        amrex::Real abar_start = eos_state.aux[iabar];
 
         nse_T_abar_from_p(eos_state.rho, eos_state.p, eos_state.aux[iye],
                           eos_state.T, eos_state.aux[iabar]);
@@ -374,29 +379,29 @@ void nse_cell_c()
 
     {
 
-        nse_state.T = temperature;
-        nse_state.rho = density;
-        nse_state.Ye = ye;
+        nse_state.T = unit_test_rp::temperature;
+        nse_state.rho = unit_test_rp::density;
+        nse_state.Ye = unit_test_rp::ye;
 
         nse_interp(nse_state);
 
-        Real abar_orig = nse_state.abar;
+        amrex::Real abar_orig = nse_state.abar;
 
         eos_t eos_state;
 
-        eos_state.T = temperature;
-        eos_state.rho = density;
+        eos_state.T = unit_test_rp::temperature;
+        eos_state.rho = unit_test_rp::density;
         eos_state.aux[iye] = nse_state.Ye;
         eos_state.aux[iabar] = nse_state.abar;
 
         eos(eos_input_rt, eos_state);
 
-        Real p_orig = eos_state.p;
+        amrex::Real p_orig = eos_state.p;
 
         // now perturb p and find T, then redo NSE to get abar and finally
         // see if we get back our new p
 
-        Real p_new = eos_state.p * 1.05;
+        amrex::Real p_new = eos_state.p * 1.05;
 
         eos_state.p = p_new;
         eos(eos_input_tp, eos_state);
@@ -413,13 +418,13 @@ void nse_cell_c()
         // now we try the new interface.  This effectively does:
         // p', T, Ye -> Abar', rho'
 
-        eos_state.T = temperature;
+        eos_state.T = unit_test_rp::temperature;
         eos_state.p = p_new;
-        eos_state.rho = density;
-        eos_state.aux[iye] = ye;
+        eos_state.rho = unit_test_rp::density;
+        eos_state.aux[iye] = unit_test_rp::ye;
         eos_state.aux[iabar] = abar_orig;
 
-        Real abar_start = eos_state.aux[iabar];
+        amrex::Real abar_start = eos_state.aux[iabar];
 
         nse_rho_abar_from_p(eos_state.T, eos_state.p, eos_state.aux[iye],
                             eos_state.rho, eos_state.aux[iabar]);
@@ -437,3 +442,4 @@ void nse_cell_c()
 
 
 }
+#endif

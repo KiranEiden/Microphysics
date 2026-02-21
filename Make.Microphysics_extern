@@ -1,6 +1,14 @@
 # This is the main include makefile for applications that want to use Microphysics
 # You should set NETWORK_OUTPUT_PATH before including this file
 
+# For some (older?) versions of HIP, inlining produces large kernels
+# that seem to cause memory issues
+ifeq ($(USE_HIP),TRUE)
+  ifeq ($(DISABLE_HIP_INLINE),TRUE)
+    EXTRACXXFLAGS += -mllvm -amdgpu-function-calls=true
+  endif
+endif
+
 # for common code paths between simplified-SDC and true-SDC, we'll
 # use the SDC define
 
@@ -21,6 +29,12 @@ ifeq ($(USE_NONAKA_PLOT),TRUE)
   DEFINES += -DNONAKA_PLOT
 endif
 
+# sometimes we benefit from loop unrolling.  This specifies
+# the size of the unroll
+NET_LOOP_UNROLL_LEN ?= 4
+DEFINES += -DNET_LOOP_UNROLL_LEN=$(NET_LOOP_UNROLL_LEN)
+
+
 SCREEN_METHOD ?= screen5
 ifeq ($(SCREEN_METHOD), null)
   DEFINES += -DSCREEN_METHOD=SCREEN_METHOD_null
@@ -34,6 +48,15 @@ else ifeq ($(SCREEN_METHOD), chabrier1998)
   DEFINES += -DSCREEN_METHOD=SCREEN_METHOD_chabrier1998
 else
   $(error Invalid value for SCREEN_METHOD)
+endif
+
+NEUTRINO_METHOD ?= sneut5
+ifeq ($(NEUTRINO_METHOD), kipp)
+  DEFINES += -DNEUTRINO_METHOD=NEUTRINO_METHOD_kipp
+else ifeq ($(NEUTRINO_METHOD), sneut5)
+  DEFINES += -DNEUTRINO_METHOD=NEUTRINO_METHOD_sneut5
+else
+  $(error Invalid value for NEUTRINO_METHOD: $(NEUTRINO_METHOD))
 endif
 
 ifeq ($(EOS_DIR), gamma_law_general)
@@ -82,13 +105,20 @@ endif
 table:
 	@if [ ! -f helm_table.dat ]; then echo Linking helm_table.dat; ln -s $(EOS_PATH)/helm_table.dat .;  fi
 
+# USE_ALL_NSE will be used if any of the NSE techniques is applied
+ifeq ($(USE_NSE_TABLE),TRUE)
+  USE_ALL_NSE := TRUE
+endif
+
+ifeq ($(USE_NSE_NET),TRUE)
+  USE_ALL_NSE := TRUE
+endif
+
 # NSE networks need the table
 ifeq ($(USE_NSE_TABLE),TRUE)
   NSE_TABULAR_HOME ?= $(MICROPHYSICS_HOME)/nse_tabular
   EXTERN_CORE += $(NSE_TABULAR_HOME)
-  ifeq ($(findstring aprox19, $(NETWORK_DIR)), aprox19)
-     all: nsetable
-  endif
+  all: nsetable
 endif
 
 nsetable:
@@ -114,14 +144,18 @@ ifeq ($(USE_CONDUCTIVITY),TRUE)
   EXTERN_CORE += $(CONDUCTIVITY_PATH)
 endif
 
+# backwards compatibility -- remove after 25.01
+ifdef Opacity_dir
+   OPACITY_DIR=$(Opacity_dir)
+endif
 
 ifeq ($(USE_RAD), TRUE)
-   ifeq ($(Opacity_dir), null)
+   ifeq ($(OPACITY_DIR), null)
      $(error The null opacity directory has been removed, please update to rad_power_law)
    endif
    EXTERN_CORE += $(MICROPHYSICS_HOME)/opacity
 
-   OPAC_PATH := $(MICROPHYSICS_HOME)/opacity/$(Opacity_dir)
+   OPAC_PATH := $(MICROPHYSICS_HOME)/opacity/$(OPACITY_DIR)
    EXTERN_CORE += $(OPAC_PATH)
 endif
 
@@ -137,6 +171,7 @@ ifeq ($(USE_NSE_NET), TRUE)
      EXTERN_CORE += $(MICROPHYSICS_HOME)/nse_solver
      EXTERN_CORE += $(MICROPHYSICS_HOME)/util/hybrj
 endif
+EXTERN_CORE += $(MICROPHYSICS_HOME)/util/approx_math
 
 # we can't have both NSE solvers
 ifeq ($(USE_NSE_TABLE), TRUE)

@@ -2,23 +2,23 @@
 #define TFACTORS_H
 
 struct tf_t {
-    Real T9;
-    Real T9i;
-    Real T943i;
-    Real T923i;
-    Real T913i;
-    Real T913;
-    Real T923;
-    Real T953;
-    Real lnT9;
+    amrex::Real T9;
+    amrex::Real T9i;
+    amrex::Real T943i;
+    amrex::Real T923i;
+    amrex::Real T913i;
+    amrex::Real T913;
+    amrex::Real T923;
+    amrex::Real T953;
+    amrex::Real lnT9;
 };
 
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-tf_t evaluate_tfactors(const Real T)
+tf_t evaluate_tfactors(const amrex::Real T)
 {
 
     tf_t tf;
-    tf.T9 = T / 1.e9_rt;
+    tf.T9 = T * 1.e-9_rt;
     tf.T9i = 1.0_rt / tf.T9;
     tf.T913 = std::cbrt(tf.T9);
     tf.T913i = 1.0_rt / tf.T913;

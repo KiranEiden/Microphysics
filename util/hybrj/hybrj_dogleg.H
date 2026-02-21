@@ -1,6 +1,12 @@
 #ifndef HYBRJ_DOGLEG_H
 #define HYBRJ_DOGLEG_H
 
+#ifndef AMREX_USE_GPU
+#if defined(__linux__) && defined(__GLIBC__)
+#include <cfenv>
+#endif
+#endif
+
 #include <hybrj_type.H>
 #include <hybrj_enorm.H>
 
@@ -43,15 +49,15 @@
 
 template<int neqs>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void dogleg(amrex::Array1D<Real, 1, neqs * (neqs + 1) / 2>& r,
-            amrex::Array1D<Real, 1, neqs>& diag,
-            amrex::Array1D<Real, 1, neqs>& qtb,
-            Real delta,
-            amrex::Array1D<Real, 1, neqs>& x,
-            amrex::Array1D<Real, 1, neqs>& wa1,
-            amrex::Array1D<Real, 1, neqs>& wa2) {
+void dogleg(const amrex::Array1D<amrex::Real, 1, neqs * (neqs + 1) / 2>& r,
+            const amrex::Array1D<amrex::Real, 1, neqs>& diag,
+            const amrex::Array1D<amrex::Real, 1, neqs>& qtb,
+            amrex::Real delta,
+            amrex::Array1D<amrex::Real, 1, neqs>& x,
+            amrex::Array1D<amrex::Real, 1, neqs>& wa1,
+            amrex::Array1D<amrex::Real, 1, neqs>& wa2) {
 
-    Real epsmch = std::numeric_limits<Real>::epsilon();
+    amrex::Real epsmch = std::numeric_limits<amrex::Real>::epsilon();
 
     // first, calculate the gauss-newton direction.
 
@@ -62,14 +68,14 @@ void dogleg(amrex::Array1D<Real, 1, neqs * (neqs + 1) / 2>& r,
         jj = jj - k;
         int l = jj + 1;
 
-        Real sum = 0.0_rt;
+        amrex::Real sum = 0.0_rt;
         if (neqs >= jp1) {
             for (int i = jp1; i <= neqs; ++i) {
                 sum += r(l) * x(i);
                 l++;
             }
         }
-        Real temp = r(jj);
+        amrex::Real temp = r(jj);
         if (temp == 0.0_rt) {
             l = j;
             for (int i = 1; i <= j; ++i) {
@@ -91,7 +97,7 @@ void dogleg(amrex::Array1D<Real, 1, neqs * (neqs + 1) / 2>& r,
         wa1(j) = 0.0_rt;
         wa2(j) = diag(j) * x(j);
     }
-    Real qnorm = enorm(neqs, wa2);
+    amrex::Real qnorm = enorm(neqs, wa2);
 
     if (qnorm <= delta) return;
 
@@ -100,10 +106,23 @@ void dogleg(amrex::Array1D<Real, 1, neqs * (neqs + 1) / 2>& r,
 
     int l = 1;
     for (int j = 1; j <= neqs; ++j) {
-        Real temp = qtb(j);
+        amrex::Real temp = qtb(j);
         for (int i = j; i <= neqs; ++i) {
 
+#ifndef AMREX_USE_GPU
+#if defined(__linux__) && defined(__GLIBC__)
+            // we risk an overflow here, but we will deal with it,
+            // so disable checks
+            int old_excepts = fegetexcept();
+            fedisableexcept(FE_OVERFLOW);
+#endif
+#endif
             wa1(i) += r(l) * temp;
+#ifndef AMREX_USE_GPU
+#if defined(__linux__) && defined(__GLIBC__)
+            feenableexcept(old_excepts);
+#endif
+#endif
             l++;
             if ( amrex::isnan(wa1(i)) || amrex::isinf(wa1(i)) ) {
               return;
@@ -119,9 +138,9 @@ void dogleg(amrex::Array1D<Real, 1, neqs * (neqs + 1) / 2>& r,
     // calculate the norm of the scaled gradient and test for
     // the special case in which the scaled gradient is zero.
 
-    Real gnorm = enorm(neqs, wa1);
-    Real sgnorm = 0.0_rt;
-    Real alpha = delta / qnorm;
+    amrex::Real gnorm = enorm(neqs, wa1);
+    amrex::Real sgnorm = 0.0_rt;
+    amrex::Real alpha = delta / qnorm;
 
     if (gnorm != 0.0_rt) {
 
@@ -134,14 +153,14 @@ void dogleg(amrex::Array1D<Real, 1, neqs * (neqs + 1) / 2>& r,
 
         l = 1;
         for (int j = 1; j <= neqs; ++j) {
-            Real sum = 0.0_rt;
+            amrex::Real sum = 0.0_rt;
             for (int i = j; i <= neqs; ++i) {
                 sum += r(l) * wa1(i);
                 l++;
             }
             wa2(j) = sum;
         }
-        Real temp = enorm(neqs, wa2);
+        amrex::Real temp = enorm(neqs, wa2);
         sgnorm = (gnorm / temp) / temp;
 
         // test whether the scaled gradient direction is acceptable.
@@ -153,7 +172,7 @@ void dogleg(amrex::Array1D<Real, 1, neqs * (neqs + 1) / 2>& r,
             // finally, calculate the point along the dogleg
             // at which the quadratic is minimized.
 
-            Real bnorm = enorm(neqs, qtb);
+            amrex::Real bnorm = enorm(neqs, qtb);
             temp = (bnorm/gnorm)*(bnorm/qnorm)*(sgnorm/delta);
             temp = temp - (delta/qnorm) * amrex::Math::powi<2>(sgnorm/delta)
                 + std::sqrt(amrex::Math::powi<2>(temp-(delta/qnorm))
@@ -166,7 +185,7 @@ void dogleg(amrex::Array1D<Real, 1, neqs * (neqs + 1) / 2>& r,
     // form appropriate convex combination of the gauss-newton
     // direction and the scaled gradient direction.
 
-    Real temp = (1.0_rt - alpha) * amrex::min(sgnorm, delta);
+    amrex::Real temp = (1.0_rt - alpha) * amrex::min(sgnorm, delta);
 
     for (int j = 1; j <= neqs; ++j) {
         x(j) = temp * wa1(j) + alpha * x(j);
@@ -174,4 +193,3 @@ void dogleg(amrex::Array1D<Real, 1, neqs * (neqs + 1) / 2>& r,
 
 }
 #endif
-
