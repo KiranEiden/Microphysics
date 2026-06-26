@@ -1,0 +1,12 @@
+# Ambient medium
+hydrogen-2 H2 1.0 2.0
+# Ejecta (light-lanthanide-heavy binned composition)
+hydrogen-1 H1 1.0 1.0
+lanthanum-114 La114 57.0 114.0
+halfnium-144 Hf144 72.0 144.0
+# Engine wind
+hydrogen-3 H3 1.0 3.0
+
+# Auxiliary variables
+__aux_Abar
+__aux_Ye
